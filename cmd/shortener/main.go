@@ -54,7 +54,7 @@ func ShortUrl(w http.ResponseWriter, r *http.Request) {
 	MemoryStorage[shortedUrl] = originalUrl
 
 	w.Header().Set("Content-Type", "text/plain")
-	w.WriteHeader(http.StatusOK)
+	w.WriteHeader(http.StatusCreated)
 	w.Write([]byte(shortedUrl))
 }
 
