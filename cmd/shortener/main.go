@@ -5,6 +5,7 @@ import (
 	"hash/fnv"
 	"io"
 	"net/http"
+	"strings"
 )
 
 const appPort = ":8080"
@@ -29,7 +30,7 @@ func RedirectUrl(w http.ResponseWriter, r *http.Request) {
 
 func ShortUrl(w http.ResponseWriter, r *http.Request) {
 	contentType := r.Header.Get("Content-Type")
-	if contentType != "text/plain" {
+	if contentType != "" && !strings.HasPrefix(contentType, "text/plain") {
 		http.Error(w, "Unsupported content-type", http.StatusBadRequest)
 		return
 	}
@@ -55,7 +56,8 @@ func ShortUrl(w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Set("Content-Type", "text/plain")
 	w.WriteHeader(http.StatusCreated)
-	w.Write([]byte(shortedUrl))
+	fullShortedURL := fmt.Sprintf("http://localhost:8080/%s", shortedUrl)
+	w.Write([]byte(fullShortedURL))
 }
 
 func main() {
