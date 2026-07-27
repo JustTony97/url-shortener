@@ -4,6 +4,7 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 
 	"github.com/JustTony97/url-shortener.git/internal/repository"
@@ -38,7 +39,7 @@ func TestUrlHandler_RedirectUrl(t *testing.T) {
 		},
 		{
 			name:       "negative test",
-			shortedUrl: "4hvjC1",
+			shortedUrl: "unknown_id",
 			want: want{
 				code:           http.StatusBadRequest,
 				contentType:    "text/plain",
@@ -78,6 +79,90 @@ func TestUrlHandler_RedirectUrl(t *testing.T) {
 				assert.Contains(t, string(bodyBytes), tt.want.response)
 			}
 
+		})
+	}
+}
+
+func TestUrlHandler_ShortUrl(t *testing.T) {
+	type want struct {
+		code           int
+		contentType    string
+		expectedPrefix string
+	}
+
+	tests := []struct {
+		name        string
+		body        string
+		contentType string
+		want        want
+	}{
+		{
+			name:        "positive test",
+			body:        "https://yandex.ru",
+			contentType: "text/plain",
+			want: want{
+				code:           http.StatusCreated,
+				contentType:    "text/plain",
+				expectedPrefix: "http://localhost:8080/",
+			},
+		},
+		{
+			name:        "negative test - empty body",
+			body:        "",
+			contentType: "text/plain",
+			want: want{
+				code:           http.StatusBadRequest,
+				contentType:    "text/plain; charset=utf-8",
+				expectedPrefix: "Body is empty",
+			},
+		},
+		{
+			name:        "negative test - unsupported content-type",
+			body:        "https://yandex.ru",
+			contentType: "application/json",
+			want: want{
+				code:           http.StatusBadRequest,
+				contentType:    "text/plain; charset=utf-8",
+				expectedPrefix: "Unsupported content-type",
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			request := httptest.NewRequest(http.MethodPost, "/", strings.NewReader(tt.body))
+
+			if tt.contentType != "" {
+				request.Header.Set("Content-Type", tt.contentType)
+			}
+
+			w := httptest.NewRecorder()
+
+			repo := repository.NewUrlRepository()
+			srv := service.NewUrlService(repo)
+			h := NewUrlHandler(srv)
+
+			h.ShortUrl(w, request)
+
+			res := w.Result()
+			defer res.Body.Close()
+
+			assert.Equal(t, tt.want.code, res.StatusCode)
+
+			assert.Contains(t, res.Header.Get("Content-Type"), tt.want.contentType)
+			bodyBytes, err := io.ReadAll(res.Body)
+			require.NoError(t, err)
+			responseString := string(bodyBytes)
+
+			assert.Contains(t, responseString, tt.want.expectedPrefix)
+
+			if tt.want.code == http.StatusCreated {
+				shortedUrl := strings.TrimPrefix(responseString, tt.want.expectedPrefix)
+
+				savedUrl, exists := repo.GetOriginalUrl(shortedUrl)
+				assert.True(t, exists)
+				assert.Equal(t, tt.body, savedUrl)
+			}
 		})
 	}
 }
