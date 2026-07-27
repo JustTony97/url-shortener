@@ -5,6 +5,7 @@ import (
 	"io"
 
 	"github.com/JustTony97/url-shortener.git/internal/service"
+	"github.com/go-chi/chi"
 
 	"net/http"
 	"strings"
@@ -19,7 +20,7 @@ func NewUrlHandler(s *service.UrlService) *UrlHandler {
 }
 
 func (h *UrlHandler) RedirectUrl(w http.ResponseWriter, r *http.Request) {
-	shortedUrl := r.PathValue("id")
+	shortedUrl := chi.URLParam(r, "id")
 	if shortedUrl == "" {
 		http.Error(w, "ID param is missing", http.StatusBadRequest)
 		return

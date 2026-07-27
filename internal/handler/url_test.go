@@ -9,6 +9,7 @@ import (
 
 	"github.com/JustTony97/url-shortener.git/internal/repository"
 	"github.com/JustTony97/url-shortener.git/internal/service"
+	"github.com/go-chi/chi"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -22,14 +23,12 @@ func TestUrlHandler_RedirectUrl(t *testing.T) {
 	}
 	tests := []struct {
 		name       string
-		body       string
 		want       want
 		shortedUrl string
 	}{
 		{
 			name:       "positive test",
 			shortedUrl: "4hvjC1",
-
 			want: want{
 				code:           http.StatusTemporaryRedirect,
 				contentType:    "text/plain",
@@ -50,11 +49,6 @@ func TestUrlHandler_RedirectUrl(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			request := httptest.NewRequest(http.MethodGet, "/", nil)
-			request.SetPathValue("id", tt.shortedUrl)
-
-			w := httptest.NewRecorder()
-
 			repo := repository.NewUrlRepository()
 			srv := service.NewUrlService(repo)
 			h := NewUrlHandler(srv)
@@ -63,9 +57,17 @@ func TestUrlHandler_RedirectUrl(t *testing.T) {
 				repo.SetShortedUrl(tt.shortedUrl, tt.want.LocationHeader)
 			}
 
-			h.RedirectUrl(w, request)
+			r := chi.NewRouter()
+			r.Get("/{id}", h.RedirectUrl)
+
+			request := httptest.NewRequest(http.MethodGet, "/"+tt.shortedUrl, nil)
+			w := httptest.NewRecorder()
+
+			r.ServeHTTP(w, request)
+
 			res := w.Result()
 			defer res.Body.Close()
+
 			assert.Equal(t, tt.want.code, res.StatusCode)
 
 			if tt.name == "positive test" {
@@ -78,7 +80,6 @@ func TestUrlHandler_RedirectUrl(t *testing.T) {
 			if tt.want.response != "" {
 				assert.Contains(t, string(bodyBytes), tt.want.response)
 			}
-
 		})
 	}
 }
@@ -148,8 +149,8 @@ func TestUrlHandler_ShortUrl(t *testing.T) {
 			defer res.Body.Close()
 
 			assert.Equal(t, tt.want.code, res.StatusCode)
-
 			assert.Contains(t, res.Header.Get("Content-Type"), tt.want.contentType)
+
 			bodyBytes, err := io.ReadAll(res.Body)
 			require.NoError(t, err)
 			responseString := string(bodyBytes)
