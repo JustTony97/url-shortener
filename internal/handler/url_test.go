@@ -161,6 +161,9 @@ func TestUrlHandler_ShortUrl(t *testing.T) {
 			if tt.want.code == http.StatusCreated {
 				shortedUrl := strings.TrimPrefix(responseString, tt.want.expectedPrefix)
 
+				shortedUrl = strings.TrimPrefix(shortedUrl, "/")
+				shortedUrl = strings.TrimSpace(shortedUrl)
+
 				savedUrl, exists := repo.GetOriginalUrl(shortedUrl)
 				assert.True(t, exists)
 				assert.Equal(t, tt.body, savedUrl)
