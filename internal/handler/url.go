@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"io"
 
+	"github.com/JustTony97/url-shortener.git/internal/config"
 	"github.com/JustTony97/url-shortener.git/internal/service"
 	"github.com/go-chi/chi"
 
@@ -59,6 +60,6 @@ func (h *UrlHandler) ShortUrl(w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Set("Content-Type", "text/plain")
 	w.WriteHeader(http.StatusCreated)
-	fullShortedURL := fmt.Sprintf("http://localhost:8080/%s", shortedUrl)
+	fullShortedURL := fmt.Sprint(config.RedirectBaseUrl + "/" + shortedUrl)
 	w.Write([]byte(fullShortedURL))
 }

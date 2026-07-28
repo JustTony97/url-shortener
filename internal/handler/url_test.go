@@ -7,6 +7,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/JustTony97/url-shortener.git/internal/config"
 	"github.com/JustTony97/url-shortener.git/internal/repository"
 	"github.com/JustTony97/url-shortener.git/internal/service"
 	"github.com/go-chi/chi"
@@ -104,7 +105,7 @@ func TestUrlHandler_ShortUrl(t *testing.T) {
 			want: want{
 				code:           http.StatusCreated,
 				contentType:    "text/plain",
-				expectedPrefix: "http://localhost:8080/",
+				expectedPrefix: config.RedirectBaseUrl,
 			},
 		},
 		{
