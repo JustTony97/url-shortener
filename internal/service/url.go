@@ -1,29 +1,51 @@
 package service
 
 import (
+	"errors"
 	"fmt"
 	"hash/fnv"
-
-	"github.com/JustTony97/url-shortener.git/internal/repository"
+	"math/rand"
+	"strconv"
 )
 
-type UrlService struct {
-	repo *repository.UrlRepository
+type UrlRepository interface {
+	GetOriginalUrl(shortenedUrl string) (string, bool)
+	SetShortenedUrl(shortenedUrl string, originalUrl string)
 }
 
-func NewUrlService(r *repository.UrlRepository) *UrlService {
+type UrlService struct {
+	repo UrlRepository
+}
+
+func NewUrlService(r UrlRepository) *UrlService {
 	return &UrlService{repo: r}
 }
 
-func (s *UrlService) GetOriginalUrl(shortedUrl string) (string, bool) {
-	return s.repo.GetOriginalUrl(shortedUrl)
+func (s *UrlService) GetOriginalUrl(shortenedUrl string) (string, bool) {
+	return s.repo.GetOriginalUrl(shortenedUrl)
 }
 
-func (s *UrlService) CreateShortUrl(originalUrl string) string {
-	hash := fnv.New32a()
-	hash.Write([]byte(originalUrl))
-	shortedUrl := fmt.Sprintf("%x", hash.Sum32())
+func (s *UrlService) CreateShortUrl(originalUrl string) (string, error) {
+	var shortenedUrl string
+	var hashSalt = ""
 
-	s.repo.SetShortedUrl(shortedUrl, originalUrl)
-	return shortedUrl
+	for i := 0; i < 5; i++ {
+		hash := fnv.New32a()
+		hash.Write([]byte(originalUrl + hashSalt))
+		shortenedUrl = fmt.Sprintf("%x", hash.Sum32())
+
+		url, exists := s.repo.GetOriginalUrl(shortenedUrl)
+
+		if !exists {
+			s.repo.SetShortenedUrl(shortenedUrl, originalUrl)
+			return shortenedUrl, nil
+		}
+
+		if url == originalUrl {
+			return shortenedUrl, nil
+		}
+		hashSalt = strconv.Itoa(rand.Int())
+	}
+
+	return "", errors.New("Failed to generate unique short url")
 }

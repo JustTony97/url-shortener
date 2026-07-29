@@ -1,33 +1,36 @@
 package handler
 
 import (
-	"fmt"
 	"io"
 
 	"github.com/JustTony97/url-shortener.git/internal/config"
-	"github.com/JustTony97/url-shortener.git/internal/service"
-	"github.com/go-chi/chi"
+	"github.com/go-chi/chi/v5"
 
 	"net/http"
 	"strings"
 )
 
 type UrlHandler struct {
-	service *service.UrlService
+	service UrlService
 }
 
-func NewUrlHandler(s *service.UrlService) *UrlHandler {
+type UrlService interface {
+	GetOriginalUrl(shortenedUrl string) (string, bool)
+	CreateShortUrl(originalUrl string) (string, error)
+}
+
+func NewUrlHandler(s UrlService) *UrlHandler {
 	return &UrlHandler{service: s}
 }
 
 func (h *UrlHandler) RedirectUrl(w http.ResponseWriter, r *http.Request) {
-	shortedUrl := chi.URLParam(r, "id")
-	if shortedUrl == "" {
+	shortenedUrl := chi.URLParam(r, "id")
+	if shortenedUrl == "" {
 		http.Error(w, "ID param is missing", http.StatusBadRequest)
 		return
 	}
 
-	originalUrl, ok := h.service.GetOriginalUrl(shortedUrl)
+	originalUrl, ok := h.service.GetOriginalUrl(shortenedUrl)
 	if !ok {
 		http.Error(w, "Missing original URL", http.StatusBadRequest)
 		return
@@ -56,10 +59,15 @@ func (h *UrlHandler) ShortUrl(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	shortedUrl := h.service.CreateShortUrl(originalUrl)
+	shortenedUrl, err := h.service.CreateShortUrl(originalUrl)
+
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
 
 	w.Header().Set("Content-Type", "text/plain")
 	w.WriteHeader(http.StatusCreated)
-	fullShortedURL := fmt.Sprint(config.RedirectBaseUrl + "/" + shortedUrl)
-	w.Write([]byte(fullShortedURL))
+	fullShortenedUrl := config.RedirectBaseUrl + "/" + shortenedUrl
+	w.Write([]byte(fullShortenedUrl))
 }

@@ -10,7 +10,8 @@ import (
 	"github.com/JustTony97/url-shortener.git/internal/config"
 	"github.com/JustTony97/url-shortener.git/internal/repository"
 	"github.com/JustTony97/url-shortener.git/internal/service"
-	"github.com/go-chi/chi"
+	"github.com/go-chi/chi/v5"
+
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -23,13 +24,13 @@ func TestUrlHandler_RedirectUrl(t *testing.T) {
 		LocationHeader string
 	}
 	tests := []struct {
-		name       string
-		want       want
-		shortedUrl string
+		name         string
+		want         want
+		shortenedUrl string
 	}{
 		{
-			name:       "positive test",
-			shortedUrl: "4hvjC1",
+			name:         "positive test",
+			shortenedUrl: "4hvjC1",
 			want: want{
 				code:           http.StatusTemporaryRedirect,
 				contentType:    "text/plain",
@@ -38,8 +39,8 @@ func TestUrlHandler_RedirectUrl(t *testing.T) {
 			},
 		},
 		{
-			name:       "negative test",
-			shortedUrl: "unknown_id",
+			name:         "negative test",
+			shortenedUrl: "unknown_id",
 			want: want{
 				code:           http.StatusBadRequest,
 				contentType:    "text/plain",
@@ -55,13 +56,13 @@ func TestUrlHandler_RedirectUrl(t *testing.T) {
 			h := NewUrlHandler(srv)
 
 			if tt.name == "positive test" {
-				repo.SetShortedUrl(tt.shortedUrl, tt.want.LocationHeader)
+				repo.SetShortenedUrl(tt.shortenedUrl, tt.want.LocationHeader)
 			}
 
 			r := chi.NewRouter()
 			r.Get("/{id}", h.RedirectUrl)
 
-			request := httptest.NewRequest(http.MethodGet, "/"+tt.shortedUrl, nil)
+			request := httptest.NewRequest(http.MethodGet, "/"+tt.shortenedUrl, nil)
 			w := httptest.NewRecorder()
 
 			r.ServeHTTP(w, request)
@@ -159,12 +160,12 @@ func TestUrlHandler_ShortUrl(t *testing.T) {
 			assert.Contains(t, responseString, tt.want.expectedPrefix)
 
 			if tt.want.code == http.StatusCreated {
-				shortedUrl := strings.TrimPrefix(responseString, tt.want.expectedPrefix)
+				shortenedUrl := strings.TrimPrefix(responseString, tt.want.expectedPrefix)
 
-				shortedUrl = strings.TrimPrefix(shortedUrl, "/")
-				shortedUrl = strings.TrimSpace(shortedUrl)
+				shortenedUrl = strings.TrimPrefix(shortenedUrl, "/")
+				shortenedUrl = strings.TrimSpace(shortenedUrl)
 
-				savedUrl, exists := repo.GetOriginalUrl(shortedUrl)
+				savedUrl, exists := repo.GetOriginalUrl(shortenedUrl)
 				assert.True(t, exists)
 				assert.Equal(t, tt.body, savedUrl)
 			}
