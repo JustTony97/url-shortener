@@ -8,10 +8,8 @@ import (
 	"testing"
 
 	"github.com/JustTony97/url-shortener.git/internal/config"
-	"github.com/JustTony97/url-shortener.git/internal/repository"
-	"github.com/JustTony97/url-shortener.git/internal/service"
+	"github.com/JustTony97/url-shortener.git/internal/model/mocks"
 	"github.com/go-chi/chi/v5"
-
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -27,6 +25,7 @@ func TestUrlHandler_RedirectUrl(t *testing.T) {
 		name         string
 		want         want
 		shortenedUrl string
+		setupMock    func(m *mocks.MockUrlService)
 	}{
 		{
 			name:         "positive test",
@@ -36,6 +35,9 @@ func TestUrlHandler_RedirectUrl(t *testing.T) {
 				contentType:    "text/plain",
 				response:       "",
 				LocationHeader: "https://yandex.ru",
+			},
+			setupMock: func(m *mocks.MockUrlService) {
+				m.On("GetOriginalUrl", "4hvjC1").Return("https://yandex.ru", true)
 			},
 		},
 		{
@@ -47,17 +49,17 @@ func TestUrlHandler_RedirectUrl(t *testing.T) {
 				response:       "Missing original URL",
 				LocationHeader: "",
 			},
+			setupMock: func(m *mocks.MockUrlService) {
+				m.On("GetOriginalUrl", "unknown_id").Return("", false)
+			},
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			repo := repository.NewUrlRepository()
-			srv := service.NewUrlService(repo)
-			h := NewUrlHandler(srv)
+			mockService := new(mocks.MockUrlService)
+			tt.setupMock(mockService)
 
-			if tt.name == "positive test" {
-				repo.SetShortenedUrl(tt.shortenedUrl, tt.want.LocationHeader)
-			}
+			h := NewUrlHandler(mockService)
 
 			r := chi.NewRouter()
 			r.Get("/{id}", h.RedirectUrl)
@@ -82,6 +84,8 @@ func TestUrlHandler_RedirectUrl(t *testing.T) {
 			if tt.want.response != "" {
 				assert.Contains(t, string(bodyBytes), tt.want.response)
 			}
+
+			mockService.AssertExpectations(t)
 		})
 	}
 }
@@ -98,6 +102,7 @@ func TestUrlHandler_ShortUrl(t *testing.T) {
 		body        string
 		contentType string
 		want        want
+		setupMock   func(m *mocks.MockUrlService)
 	}{
 		{
 			name:        "positive test",
@@ -106,7 +111,10 @@ func TestUrlHandler_ShortUrl(t *testing.T) {
 			want: want{
 				code:           http.StatusCreated,
 				contentType:    "text/plain",
-				expectedPrefix: config.RedirectBaseUrl,
+				expectedPrefix: config.RedirectBaseUrl + "/4hvjC1",
+			},
+			setupMock: func(m *mocks.MockUrlService) {
+				m.On("CreateShortUrl", "https://yandex.ru").Return("4hvjC1", nil)
 			},
 		},
 		{
@@ -118,6 +126,7 @@ func TestUrlHandler_ShortUrl(t *testing.T) {
 				contentType:    "text/plain; charset=utf-8",
 				expectedPrefix: "Body is empty",
 			},
+			setupMock: func(m *mocks.MockUrlService) {},
 		},
 		{
 			name:        "negative test - unsupported content-type",
@@ -128,6 +137,7 @@ func TestUrlHandler_ShortUrl(t *testing.T) {
 				contentType:    "text/plain; charset=utf-8",
 				expectedPrefix: "Unsupported content-type",
 			},
+			setupMock: func(m *mocks.MockUrlService) {},
 		},
 	}
 
@@ -141,9 +151,10 @@ func TestUrlHandler_ShortUrl(t *testing.T) {
 
 			w := httptest.NewRecorder()
 
-			repo := repository.NewUrlRepository()
-			srv := service.NewUrlService(repo)
-			h := NewUrlHandler(srv)
+			mockService := new(mocks.MockUrlService)
+			tt.setupMock(mockService)
+
+			h := NewUrlHandler(mockService)
 
 			h.ShortUrl(w, request)
 
@@ -159,16 +170,7 @@ func TestUrlHandler_ShortUrl(t *testing.T) {
 
 			assert.Contains(t, responseString, tt.want.expectedPrefix)
 
-			if tt.want.code == http.StatusCreated {
-				shortenedUrl := strings.TrimPrefix(responseString, tt.want.expectedPrefix)
-
-				shortenedUrl = strings.TrimPrefix(shortenedUrl, "/")
-				shortenedUrl = strings.TrimSpace(shortenedUrl)
-
-				savedUrl, exists := repo.GetOriginalUrl(shortenedUrl)
-				assert.True(t, exists)
-				assert.Equal(t, tt.body, savedUrl)
-			}
+			mockService.AssertExpectations(t)
 		})
 	}
 }
