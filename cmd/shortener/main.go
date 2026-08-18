@@ -1,12 +1,13 @@
 package main
 
 import (
-	"fmt"
 	"log"
 	"net/http"
 
 	"github.com/JustTony97/url-shortener.git/internal/config"
 	"github.com/JustTony97/url-shortener.git/internal/handler"
+	"github.com/JustTony97/url-shortener.git/internal/logger"
+	"github.com/JustTony97/url-shortener.git/internal/middlewares"
 	"github.com/JustTony97/url-shortener.git/internal/repository"
 	"github.com/JustTony97/url-shortener.git/internal/service"
 
@@ -14,6 +15,8 @@ import (
 )
 
 func main() {
+	logger.InitLogger()
+
 	cfg, err := config.Load()
 	if err != nil {
 		log.Fatal(err)
@@ -24,10 +27,10 @@ func main() {
 	service := service.NewUrlService(repo)
 	handler := handler.NewUrlHandler(service, cfg)
 
-	r.Post("/", handler.ShortUrl)
-	r.Get("/{id}", handler.RedirectUrl)
+	r.Post("/", middlewares.WithLogging(handler.ShortUrl))
+	r.Get("/{id}", middlewares.WithLogging(handler.RedirectUrl))
 
-	fmt.Printf("Starting listening on %s ...\n", cfg.ServerAddr)
+	log.Printf("Starting listening on %s ...\n", cfg.ServerAddr)
 	err = http.ListenAndServe(cfg.ServerAddr, r)
 
 	if err != nil {
