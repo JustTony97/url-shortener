@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"encoding/json"
 	"fmt"
 	"io"
 
@@ -72,4 +73,50 @@ func (h *UrlHandler) ShortUrl(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusCreated)
 	fullShortenedUrl := fmt.Sprintf("%s/%s", h.cfg.BaseUrl, shortenedUrl)
 	w.Write([]byte(fullShortenedUrl))
+}
+
+type ApiShortenURLRequest struct {
+	Url string `json:"url"`
+}
+
+type ApiShortenURLResponse struct {
+	Result string `json:"result"`
+}
+
+func (h *UrlHandler) ShortenUrl(w http.ResponseWriter, r *http.Request) {
+	contentType := r.Header.Get("Content-Type")
+	if contentType != "" && !strings.HasPrefix(contentType, "application/json") {
+		http.Error(w, "Unsupported content-type", http.StatusBadRequest)
+		return
+	}
+	decoder := json.NewDecoder(r.Body)
+	defer r.Body.Close()
+	var request ApiShortenURLRequest
+	err := decoder.Decode(&request)
+
+	if err != nil {
+		http.Error(w, "Failed to validate body", http.StatusBadRequest)
+		return
+	}
+
+	if request.Url == "" {
+		http.Error(w, "Body is empty", http.StatusBadRequest)
+		return
+	}
+
+	shortenedUrl, err := h.service.CreateShortUrl(request.Url)
+
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusCreated)
+
+	encoder := json.NewEncoder(w)
+	encoder.Encode(ApiShortenURLResponse{
+		Result: fmt.Sprintf("%s/%s", h.cfg.BaseUrl, shortenedUrl),
+	})
+
 }

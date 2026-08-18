@@ -179,3 +179,66 @@ func TestUrlHandler_ShortUrl(t *testing.T) {
 		})
 	}
 }
+
+func TestUrlHandler_ShortenUrl(t *testing.T) {
+	type want struct {
+		code           int
+		contentType    string
+		expectedPrefix string
+	}
+
+	tests := []struct {
+		name        string
+		body        string
+		contentType string
+		want        want
+		setupMock   func(m *mocks.MockUrlService)
+	}{
+		{
+			name:        "positive test",
+			body:        "{\"url\": \"https://yandex.ru\"}",
+			contentType: "application/json",
+			want: want{
+				code:           http.StatusCreated,
+				contentType:    "application/json",
+				expectedPrefix: testCfg.BaseUrl + "/4hvjC1",
+			},
+			setupMock: func(m *mocks.MockUrlService) {
+				m.On("CreateShortUrl", "https://yandex.ru").Return("4hvjC1", nil)
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			request := httptest.NewRequest(http.MethodPost, "/api/shorten", strings.NewReader(tt.body))
+
+			if tt.contentType != "" {
+				request.Header.Set("Content-Type", tt.contentType)
+			}
+
+			w := httptest.NewRecorder()
+
+			mockService := new(mocks.MockUrlService)
+			tt.setupMock(mockService)
+
+			h := NewUrlHandler(mockService, testCfg)
+
+			h.ShortenUrl(w, request)
+
+			res := w.Result()
+			defer res.Body.Close()
+
+			assert.Equal(t, tt.want.code, res.StatusCode)
+			assert.Contains(t, res.Header.Get("Content-Type"), tt.want.contentType)
+
+			bodyBytes, err := io.ReadAll(res.Body)
+			require.NoError(t, err)
+			responseString := string(bodyBytes)
+
+			assert.Contains(t, responseString, tt.want.expectedPrefix)
+
+			mockService.AssertExpectations(t)
+		})
+	}
+}
