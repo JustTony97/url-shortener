@@ -14,6 +14,11 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+var testCfg = config.Config{
+	ServerAddr: ":8080",
+	BaseUrl:    "http://localhost:8080",
+}
+
 func TestUrlHandler_RedirectUrl(t *testing.T) {
 	type want struct {
 		code           int
@@ -59,7 +64,7 @@ func TestUrlHandler_RedirectUrl(t *testing.T) {
 			mockService := new(mocks.MockUrlService)
 			tt.setupMock(mockService)
 
-			h := NewUrlHandler(mockService)
+			h := NewUrlHandler(mockService, testCfg)
 
 			r := chi.NewRouter()
 			r.Get("/{id}", h.RedirectUrl)
@@ -111,7 +116,7 @@ func TestUrlHandler_ShortUrl(t *testing.T) {
 			want: want{
 				code:           http.StatusCreated,
 				contentType:    "text/plain",
-				expectedPrefix: config.RedirectBaseUrl + "/4hvjC1",
+				expectedPrefix: testCfg.BaseUrl + "/4hvjC1",
 			},
 			setupMock: func(m *mocks.MockUrlService) {
 				m.On("CreateShortUrl", "https://yandex.ru").Return("4hvjC1", nil)
@@ -154,7 +159,7 @@ func TestUrlHandler_ShortUrl(t *testing.T) {
 			mockService := new(mocks.MockUrlService)
 			tt.setupMock(mockService)
 
-			h := NewUrlHandler(mockService)
+			h := NewUrlHandler(mockService, testCfg)
 
 			h.ShortUrl(w, request)
 

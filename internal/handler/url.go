@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"fmt"
 	"io"
 
 	"github.com/JustTony97/url-shortener.git/internal/config"
@@ -12,6 +13,7 @@ import (
 
 type UrlHandler struct {
 	service UrlService
+	cfg     config.Config
 }
 
 type UrlService interface {
@@ -19,8 +21,8 @@ type UrlService interface {
 	CreateShortUrl(originalUrl string) (string, error)
 }
 
-func NewUrlHandler(s UrlService) *UrlHandler {
-	return &UrlHandler{service: s}
+func NewUrlHandler(s UrlService, c config.Config) *UrlHandler {
+	return &UrlHandler{service: s, cfg: c}
 }
 
 func (h *UrlHandler) RedirectUrl(w http.ResponseWriter, r *http.Request) {
@@ -68,6 +70,6 @@ func (h *UrlHandler) ShortUrl(w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Set("Content-Type", "text/plain")
 	w.WriteHeader(http.StatusCreated)
-	fullShortenedUrl := config.RedirectBaseUrl + "/" + shortenedUrl
+	fullShortenedUrl := fmt.Sprintf("%s/%s", h.cfg.BaseUrl, shortenedUrl)
 	w.Write([]byte(fullShortenedUrl))
 }

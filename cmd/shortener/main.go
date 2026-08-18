@@ -1,8 +1,8 @@
 package main
 
 import (
-	"flag"
 	"fmt"
+	"log"
 	"net/http"
 
 	"github.com/JustTony97/url-shortener.git/internal/config"
@@ -14,18 +14,23 @@ import (
 )
 
 func main() {
-	flag.Parse()
+	cfg, err := config.Load()
+	if err != nil {
+		log.Fatal(err)
+	}
+
 	r := chi.NewRouter()
 	repo := repository.NewUrlRepository()
 	service := service.NewUrlService(repo)
-	handler := handler.NewUrlHandler(service)
+	handler := handler.NewUrlHandler(service, cfg)
 
 	r.Post("/", handler.ShortUrl)
 	r.Get("/{id}", handler.RedirectUrl)
 
-	fmt.Printf("Starting listening on %s ...\n", config.RunAddr)
-	err := http.ListenAndServe(config.RunAddr, r)
+	fmt.Printf("Starting listening on %s ...\n", cfg.ServerAddr)
+	err = http.ListenAndServe(cfg.ServerAddr, r)
+
 	if err != nil {
-		panic(err)
+		log.Fatal(err)
 	}
 }
