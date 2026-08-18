@@ -27,9 +27,9 @@ func main() {
 	service := service.NewUrlService(repo)
 	handler := handler.NewUrlHandler(service, cfg)
 
-	r.Post("/", middlewares.WithLogging(handler.ShortUrl))
-	r.Post("/api/shorten", middlewares.WithLogging(handler.ShortenUrl))
-	r.Get("/{id}", middlewares.WithLogging(handler.RedirectUrl))
+	r.Post("/", middlewares.WithCompress(middlewares.WithLogging(handler.ShortUrl)))
+	r.Post("/api/shorten", middlewares.WithCompress(middlewares.WithLogging(handler.ShortenUrl)))
+	r.Get("/{id}", middlewares.WithCompress(middlewares.WithLogging(handler.RedirectUrl)))
 
 	log.Printf("Starting listening on %s ...\n", cfg.ServerAddr)
 	err = http.ListenAndServe(cfg.ServerAddr, r)
