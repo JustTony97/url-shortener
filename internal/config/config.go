@@ -18,7 +18,7 @@ func Load() (Config, error) {
 
 	flag.StringVar(&cfg.ServerAddr, "a", ":8080", "Server address")
 	flag.StringVar(&cfg.BaseUrl, "b", "http://localhost:8080", "Base URL for short links redirection")
-	flag.StringVar(&cfg.FileStoragePath, "f", "./data/storage.json", "Path for file storage")
+	flag.StringVar(&cfg.FileStoragePath, "f", "./storage.json", "Path for file storage")
 
 	flag.Parse()
 
