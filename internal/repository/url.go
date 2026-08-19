@@ -26,8 +26,31 @@ func NewUrlRepository(cfg config.Config) *UrlRepository {
 
 func (r *UrlRepository) SetShortenedUrl(shortenedUrl string, originalUrl string) {
 	r.mu.Lock()
-	defer r.mu.Unlock()
+
 	r.cache[shortenedUrl] = originalUrl
+
+	urls := make([]model.URL, 0, len(r.cache))
+	for short, original := range r.cache {
+		urls = append(urls, model.URL{
+			UUID:        "",
+			ShortUrl:    short,
+			OriginalUrl: original,
+		})
+	}
+
+	r.mu.Unlock()
+
+	data, err := json.MarshalIndent(urls, "", "  ")
+	if err != nil {
+		logger.Log.Errorf("failed to marshal urls: %v", err)
+		return
+	}
+
+	err = os.WriteFile(r.cfg.FileStoragePath, data, 0644)
+	if err != nil {
+		logger.Log.Errorf("failed to write urls to file %s: %v", r.cfg.FileStoragePath, err)
+		return
+	}
 }
 
 func (r *UrlRepository) GetOriginalUrl(shortenedUrl string) (string, bool) {
@@ -55,24 +78,4 @@ func (r *UrlRepository) Load() error {
 	}
 	logger.Log.Infof("Succesfully loaded %d urls!", len(r.cache))
 	return nil
-}
-
-func (r *UrlRepository) Flush() error {
-	r.mu.RLock()
-	urls := make([]model.URL, 0, len(r.cache))
-	for short, original := range r.cache {
-		urls = append(urls, model.URL{
-			UUID:        "",
-			ShortUrl:    short,
-			OriginalUrl: original,
-		})
-	}
-	r.mu.RUnlock()
-
-	data, err := json.MarshalIndent(urls, "", "  ")
-	if err != nil {
-		return err
-	}
-
-	return os.WriteFile(r.cfg.FileStoragePath, data, 0644)
 }
