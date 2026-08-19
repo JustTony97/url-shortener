@@ -28,8 +28,8 @@ func main() {
 	service := service.NewUrlService(repo)
 	handler := handler.NewUrlHandler(service, cfg)
 
-	r.Post("/", middlewares.WithCompress(handler.ShortUrl))
-	r.Post("/api/shorten", middlewares.WithCompress(handler.ShortenUrl))
+	r.Post("/", middlewares.WithCompress(middlewares.WithDecompress(handler.ShortUrl)))
+	r.Post("/api/shorten", middlewares.WithCompress(middlewares.WithDecompress(handler.ShortenUrl)))
 	r.Get("/{id}", handler.RedirectUrl)
 
 	log.Printf("Starting listening on %s ...\n", cfg.ServerAddr)
