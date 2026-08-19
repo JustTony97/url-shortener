@@ -6,6 +6,7 @@ import (
 	"io"
 
 	"github.com/JustTony97/url-shortener.git/internal/config"
+	"github.com/JustTony97/url-shortener.git/internal/model"
 	"github.com/go-chi/chi/v5"
 
 	"net/http"
@@ -75,14 +76,6 @@ func (h *UrlHandler) ShortUrl(w http.ResponseWriter, r *http.Request) {
 	w.Write([]byte(fullShortenedUrl))
 }
 
-type ApiShortenURLRequest struct {
-	Url string `json:"url"`
-}
-
-type ApiShortenURLResponse struct {
-	Result string `json:"result"`
-}
-
 func (h *UrlHandler) ShortenUrl(w http.ResponseWriter, r *http.Request) {
 	contentType := r.Header.Get("Content-Type")
 	if contentType != "" && !strings.HasPrefix(contentType, "application/json") {
@@ -91,7 +84,7 @@ func (h *UrlHandler) ShortenUrl(w http.ResponseWriter, r *http.Request) {
 	}
 	decoder := json.NewDecoder(r.Body)
 	defer r.Body.Close()
-	var request ApiShortenURLRequest
+	var request model.ApiShortenURLRequest
 	err := decoder.Decode(&request)
 
 	if err != nil {
@@ -115,7 +108,7 @@ func (h *UrlHandler) ShortenUrl(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusCreated)
 
 	encoder := json.NewEncoder(w)
-	encoder.Encode(ApiShortenURLResponse{
+	encoder.Encode(model.ApiShortenURLResponse{
 		Result: fmt.Sprintf("%s/%s", h.cfg.BaseUrl, shortenedUrl),
 	})
 

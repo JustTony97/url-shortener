@@ -3,6 +3,7 @@ package main
 import (
 	"log"
 	"net/http"
+	"time"
 
 	"github.com/JustTony97/url-shortener.git/internal/config"
 	"github.com/JustTony97/url-shortener.git/internal/handler"
@@ -24,7 +25,13 @@ func main() {
 
 	r := chi.NewRouter()
 	r.Use(middlewares.WithLogging)
-	repo := repository.NewUrlRepository()
+	repo := repository.NewUrlRepository(cfg)
+	err = repo.Load()
+	if err != nil {
+		log.Fatal(err)
+	}
+	go startPeriodicFlush(repo, 10*time.Second)
+
 	service := service.NewUrlService(repo)
 	handler := handler.NewUrlHandler(service, cfg)
 
@@ -37,5 +44,16 @@ func main() {
 
 	if err != nil {
 		log.Fatal(err)
+	}
+}
+
+func startPeriodicFlush(repo *repository.UrlRepository, interval time.Duration) {
+	ticker := time.NewTicker(interval)
+	defer ticker.Stop()
+
+	for range ticker.C {
+		if err := repo.Flush(); err != nil {
+			logger.Log.Errorf("Periodic flush failed: %v", err)
+		}
 	}
 }
