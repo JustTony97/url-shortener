@@ -23,13 +23,15 @@ func main() {
 	}
 
 	r := chi.NewRouter()
+	r.Use(middlewares.WithLogging)
+	r.Use(middlewares.WithCompress)
 	repo := repository.NewUrlRepository()
 	service := service.NewUrlService(repo)
 	handler := handler.NewUrlHandler(service, cfg)
 
-	r.Post("/", middlewares.WithCompress(middlewares.WithLogging(handler.ShortUrl)))
-	r.Post("/api/shorten", middlewares.WithCompress(middlewares.WithLogging(handler.ShortenUrl)))
-	r.Get("/{id}", middlewares.WithCompress(middlewares.WithLogging(handler.RedirectUrl)))
+	r.Post("/", handler.ShortUrl)
+	r.Post("/api/shorten", handler.ShortenUrl)
+	r.Get("/{id}", handler.RedirectUrl)
 
 	log.Printf("Starting listening on %s ...\n", cfg.ServerAddr)
 	err = http.ListenAndServe(cfg.ServerAddr, r)
