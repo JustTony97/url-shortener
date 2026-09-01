@@ -10,6 +10,8 @@ import (
 	"github.com/JustTony97/url-shortener.git/internal/middlewares"
 	"github.com/JustTony97/url-shortener.git/internal/repository"
 	"github.com/JustTony97/url-shortener.git/internal/service"
+	_ "github.com/jackc/pgx/stdlib"
+	"github.com/jmoiron/sqlx"
 
 	"github.com/go-chi/chi/v5"
 )
@@ -22,6 +24,13 @@ func main() {
 		log.Fatal(err)
 	}
 
+	db := sqlx.MustOpen("pgx", cfg.DatabaseDSN)
+	defer db.Close()
+	err = db.Ping()
+	if err != nil {
+		log.Fatal(err.Error())
+	}
+
 	r := chi.NewRouter()
 	r.Use(middlewares.WithLogging)
 	repo := repository.NewUrlRepository(cfg)
@@ -31,11 +40,13 @@ func main() {
 	}
 
 	service := service.NewUrlService(repo)
-	handler := handler.NewUrlHandler(service, cfg)
+	urlHandler := handler.NewUrlHandler(service, cfg)
+	baseHandler := handler.NewBaseHandler(db)
 
-	r.Post("/", middlewares.WithCompress(middlewares.WithDecompress(handler.ShortUrl)))
-	r.Post("/api/shorten", middlewares.WithCompress(middlewares.WithDecompress(handler.ShortenUrl)))
-	r.Get("/{id}", handler.RedirectUrl)
+	r.Post("/", middlewares.WithCompress(middlewares.WithDecompress(urlHandler.ShortUrl)))
+	r.Post("/api/shorten", middlewares.WithCompress(middlewares.WithDecompress(urlHandler.ShortenUrl)))
+	r.Get("/{id}", urlHandler.RedirectUrl)
+	r.Get("/ping", baseHandler.Healthcheck)
 
 	log.Printf("Starting listening on %s ...\n", cfg.ServerAddr)
 	err = http.ListenAndServe(cfg.ServerAddr, r)
