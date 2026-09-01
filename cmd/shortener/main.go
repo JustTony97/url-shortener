@@ -26,10 +26,10 @@ func main() {
 
 	db := sqlx.MustOpen("pgx", cfg.DatabaseDSN)
 	defer db.Close()
-	err = db.Ping()
-	if err != nil {
-		log.Fatal(err.Error())
-	}
+	// err = db.Ping()
+	// if err != nil {
+	// 	log.Fatal(err.Error())
+	// }
 
 	r := chi.NewRouter()
 	r.Use(middlewares.WithLogging)
