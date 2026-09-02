@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -19,8 +20,8 @@ type UrlHandler struct {
 }
 
 type UrlService interface {
-	GetOriginalUrl(shortenedUrl string) (string, bool)
-	CreateShortUrl(originalUrl string) (string, error)
+	GetOriginalUrl(ctx context.Context, shortenedUrl string) (string, bool, error)
+	CreateShortUrl(ctx context.Context, originalUrl string) (string, error)
 }
 
 func NewUrlHandler(s UrlService, c config.Config) *UrlHandler {
@@ -34,7 +35,11 @@ func (h *UrlHandler) RedirectUrl(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	originalUrl, ok := h.service.GetOriginalUrl(shortenedUrl)
+	originalUrl, ok, err := h.service.GetOriginalUrl(r.Context(), shortenedUrl)
+	if err != nil {
+		http.Error(w, "Internal server error", http.StatusInternalServerError)
+		return
+	}
 	if !ok {
 		http.Error(w, "Missing original URL", http.StatusBadRequest)
 		return
@@ -63,10 +68,9 @@ func (h *UrlHandler) ShortUrl(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	shortenedUrl, err := h.service.CreateShortUrl(originalUrl)
-
+	shortenedUrl, err := h.service.CreateShortUrl(r.Context(), originalUrl)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
+		http.Error(w, "Internal server error", http.StatusInternalServerError)
 		return
 	}
 
@@ -97,10 +101,9 @@ func (h *UrlHandler) ShortenUrl(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	shortenedUrl, err := h.service.CreateShortUrl(request.Url)
-
+	shortenedUrl, err := h.service.CreateShortUrl(r.Context(), request.Url)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
+		http.Error(w, "Internal server error", http.StatusInternalServerError)
 		return
 	}
 
@@ -111,5 +114,4 @@ func (h *UrlHandler) ShortenUrl(w http.ResponseWriter, r *http.Request) {
 	encoder.Encode(model.ApiShortenURLResponse{
 		Result: fmt.Sprintf("%s/%s", h.cfg.BaseUrl, shortenedUrl),
 	})
-
 }

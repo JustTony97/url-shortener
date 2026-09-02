@@ -10,10 +10,13 @@ import (
 	"github.com/JustTony97/url-shortener.git/internal/middlewares"
 	"github.com/JustTony97/url-shortener.git/internal/repository"
 	"github.com/JustTony97/url-shortener.git/internal/service"
+	"github.com/go-chi/chi/v5"
+	"github.com/golang-migrate/migrate/v4"
+	"github.com/golang-migrate/migrate/v4/database/postgres"
+	_ "github.com/golang-migrate/migrate/v4/source/file"
 	_ "github.com/jackc/pgx/stdlib"
 	"github.com/jmoiron/sqlx"
-
-	"github.com/go-chi/chi/v5"
+	_ "github.com/lib/pq"
 )
 
 func main() {
@@ -23,21 +26,40 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
-
 	db := sqlx.MustOpen("pgx", cfg.DatabaseDSN)
 	defer db.Close()
-	// err = db.Ping()
-	// if err != nil {
-	// 	log.Fatal(err.Error())
-	// }
+
+	var repo repository.Repository
+
+	if cfg.DatabaseDSN != "" {
+		logger.Log.Infof("Using db repository")
+
+		driver, err := postgres.WithInstance(db.DB, &postgres.Config{})
+		if err != nil {
+			logger.Log.Fatalf("Failed to create migrate driver: %v", err)
+		}
+
+		m, err := migrate.NewWithDatabaseInstance("file://./migrations", "postgres", driver)
+		if err != nil {
+			logger.Log.Fatalf("Failed to initialize migrations: %v", err)
+		}
+		defer m.Close()
+
+		if err := m.Up(); err != nil && err != migrate.ErrNoChange {
+			logger.Log.Fatalf("Failed to run migrations: %v", err)
+		}
+		repo = repository.NewDatabaseRepository(db)
+
+	} else if cfg.FileStoragePath != "" {
+		logger.Log.Infof("Using file repository")
+		repo = repository.NewFileRepository(cfg)
+	} else {
+		logger.Log.Info("Using memory repository")
+		repo = repository.NewMemoryRepository()
+	}
 
 	r := chi.NewRouter()
 	r.Use(middlewares.WithLogging)
-	repo := repository.NewUrlRepository(cfg)
-	err = repo.Load()
-	if err != nil {
-		log.Fatal(err)
-	}
 
 	service := service.NewUrlService(repo)
 	urlHandler := handler.NewUrlHandler(service, cfg)

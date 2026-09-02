@@ -11,6 +11,7 @@ import (
 	"github.com/JustTony97/url-shortener.git/internal/model/mocks"
 	"github.com/go-chi/chi/v5"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 )
 
@@ -42,7 +43,7 @@ func TestUrlHandler_RedirectUrl(t *testing.T) {
 				LocationHeader: "https://yandex.ru",
 			},
 			setupMock: func(m *mocks.MockUrlService) {
-				m.On("GetOriginalUrl", "4hvjC1").Return("https://yandex.ru", true)
+				m.On("GetOriginalUrl", mock.Anything, "4hvjC1").Return("https://yandex.ru", true, nil)
 			},
 		},
 		{
@@ -55,7 +56,7 @@ func TestUrlHandler_RedirectUrl(t *testing.T) {
 				LocationHeader: "",
 			},
 			setupMock: func(m *mocks.MockUrlService) {
-				m.On("GetOriginalUrl", "unknown_id").Return("", false)
+				m.On("GetOriginalUrl", mock.Anything, "unknown_id").Return("", false, nil)
 			},
 		},
 	}
@@ -119,7 +120,7 @@ func TestUrlHandler_ShortUrl(t *testing.T) {
 				expectedPrefix: testCfg.BaseUrl + "/4hvjC1",
 			},
 			setupMock: func(m *mocks.MockUrlService) {
-				m.On("CreateShortUrl", "https://yandex.ru").Return("4hvjC1", nil)
+				m.On("CreateShortUrl", mock.Anything, "https://yandex.ru").Return("4hvjC1", nil)
 			},
 		},
 		{
@@ -204,7 +205,7 @@ func TestUrlHandler_ShortenUrl(t *testing.T) {
 				expectedPrefix: testCfg.BaseUrl + "/4hvjC1",
 			},
 			setupMock: func(m *mocks.MockUrlService) {
-				m.On("CreateShortUrl", "https://yandex.ru").Return("4hvjC1", nil)
+				m.On("CreateShortUrl", mock.Anything, "https://yandex.ru").Return("4hvjC1", nil)
 			},
 		},
 	}

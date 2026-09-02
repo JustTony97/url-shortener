@@ -1,6 +1,7 @@
 package service
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"hash/fnv"
@@ -9,8 +10,8 @@ import (
 )
 
 type UrlRepository interface {
-	GetOriginalUrl(shortenedUrl string) (string, bool)
-	SetShortenedUrl(shortenedUrl string, originalUrl string)
+	GetOriginalUrl(ctx context.Context, shortenedUrl string) (string, bool, error)
+	SetShortenedUrl(ctx context.Context, shortenedUrl string, originalUrl string) error
 }
 
 type UrlService struct {
@@ -21,23 +22,32 @@ func NewUrlService(r UrlRepository) *UrlService {
 	return &UrlService{repo: r}
 }
 
-func (s *UrlService) GetOriginalUrl(shortenedUrl string) (string, bool) {
-	return s.repo.GetOriginalUrl(shortenedUrl)
+func (s *UrlService) GetOriginalUrl(ctx context.Context, shortenedUrl string) (string, bool, error) {
+	return s.repo.GetOriginalUrl(ctx, shortenedUrl)
 }
 
-func (s *UrlService) CreateShortUrl(originalUrl string) (string, error) {
+func (s *UrlService) CreateShortUrl(ctx context.Context, originalUrl string) (string, error) {
 	var shortenedUrl string
 	var hashSalt = ""
 
 	for i := 0; i < 5; i++ {
 		hash := fnv.New32a()
-		hash.Write([]byte(originalUrl + hashSalt))
+		_, err := hash.Write([]byte(originalUrl + hashSalt))
+		if err != nil {
+			return "", err
+		}
 		shortenedUrl = fmt.Sprintf("%x", hash.Sum32())
 
-		url, exists := s.repo.GetOriginalUrl(shortenedUrl)
+		url, exists, err := s.repo.GetOriginalUrl(ctx, shortenedUrl)
+		if err != nil {
+			return "", err
+		}
 
 		if !exists {
-			s.repo.SetShortenedUrl(shortenedUrl, originalUrl)
+			err := s.repo.SetShortenedUrl(ctx, shortenedUrl, originalUrl)
+			if err != nil {
+				return "", err
+			}
 			return shortenedUrl, nil
 		}
 
@@ -47,5 +57,5 @@ func (s *UrlService) CreateShortUrl(originalUrl string) (string, error) {
 		hashSalt = strconv.Itoa(rand.Int())
 	}
 
-	return "", errors.New("Failed to generate unique short url")
+	return "", errors.New("failed to generate unique short url")
 }
