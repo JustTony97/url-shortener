@@ -14,28 +14,28 @@ import (
 	"strings"
 )
 
-type UrlHandler struct {
-	service UrlService
+type URLHandler struct {
+	service URLService
 	cfg     config.Config
 }
 
-type UrlService interface {
-	GetOriginalUrl(ctx context.Context, shortenedUrl string) (string, bool, error)
-	CreateShortUrl(ctx context.Context, originalUrl string) (string, error)
+type URLService interface {
+	GetOriginalURL(ctx context.Context, shortenedURL string) (string, bool, error)
+	CreateShortURL(ctx context.Context, originalURL string) (string, error)
 }
 
-func NewUrlHandler(s UrlService, c config.Config) *UrlHandler {
-	return &UrlHandler{service: s, cfg: c}
+func NewURLHandler(s URLService, c config.Config) *URLHandler {
+	return &URLHandler{service: s, cfg: c}
 }
 
-func (h *UrlHandler) RedirectUrl(w http.ResponseWriter, r *http.Request) {
-	shortenedUrl := chi.URLParam(r, "id")
-	if shortenedUrl == "" {
+func (h *URLHandler) RedirectURL(w http.ResponseWriter, r *http.Request) {
+	shortenedURL := chi.URLParam(r, "id")
+	if shortenedURL == "" {
 		http.Error(w, "ID param is missing", http.StatusBadRequest)
 		return
 	}
 
-	originalUrl, ok, err := h.service.GetOriginalUrl(r.Context(), shortenedUrl)
+	originalURL, ok, err := h.service.GetOriginalURL(r.Context(), shortenedURL)
 	if err != nil {
 		http.Error(w, "Internal server error", http.StatusInternalServerError)
 		return
@@ -45,10 +45,10 @@ func (h *UrlHandler) RedirectUrl(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	http.Redirect(w, r, originalUrl, http.StatusTemporaryRedirect)
+	http.Redirect(w, r, originalURL, http.StatusTemporaryRedirect)
 }
 
-func (h *UrlHandler) ShortUrl(w http.ResponseWriter, r *http.Request) {
+func (h *URLHandler) ShortURL(w http.ResponseWriter, r *http.Request) {
 	contentType := r.Header.Get("Content-Type")
 	if contentType != "" && !strings.HasPrefix(contentType, "text/plain") {
 		http.Error(w, "Unsupported content-type", http.StatusBadRequest)
@@ -62,13 +62,13 @@ func (h *UrlHandler) ShortUrl(w http.ResponseWriter, r *http.Request) {
 	}
 	defer r.Body.Close()
 
-	originalUrl := string(bodyBytes)
-	if originalUrl == "" {
+	originalURL := string(bodyBytes)
+	if originalURL == "" {
 		http.Error(w, "Body is empty", http.StatusBadRequest)
 		return
 	}
 
-	shortenedUrl, err := h.service.CreateShortUrl(r.Context(), originalUrl)
+	shortenedURL, err := h.service.CreateShortURL(r.Context(), originalURL)
 	if err != nil {
 		http.Error(w, "Internal server error", http.StatusInternalServerError)
 		return
@@ -76,11 +76,11 @@ func (h *UrlHandler) ShortUrl(w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Set("Content-Type", "text/plain")
 	w.WriteHeader(http.StatusCreated)
-	fullShortenedUrl := fmt.Sprintf("%s/%s", h.cfg.BaseUrl, shortenedUrl)
-	w.Write([]byte(fullShortenedUrl))
+	fullShortenedURL := fmt.Sprintf("%s/%s", h.cfg.BaseURL, shortenedURL)
+	w.Write([]byte(fullShortenedURL))
 }
 
-func (h *UrlHandler) ShortenUrl(w http.ResponseWriter, r *http.Request) {
+func (h *URLHandler) ShortenURL(w http.ResponseWriter, r *http.Request) {
 	contentType := r.Header.Get("Content-Type")
 	if contentType != "" && !strings.HasPrefix(contentType, "application/json") {
 		http.Error(w, "Unsupported content-type", http.StatusBadRequest)
@@ -88,7 +88,7 @@ func (h *UrlHandler) ShortenUrl(w http.ResponseWriter, r *http.Request) {
 	}
 	decoder := json.NewDecoder(r.Body)
 	defer r.Body.Close()
-	var request model.ApiShortenURLRequest
+	var request model.APIShortenURLRequest
 	err := decoder.Decode(&request)
 
 	if err != nil {
@@ -96,12 +96,12 @@ func (h *UrlHandler) ShortenUrl(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if request.Url == "" {
+	if request.URL == "" {
 		http.Error(w, "Body is empty", http.StatusBadRequest)
 		return
 	}
 
-	shortenedUrl, err := h.service.CreateShortUrl(r.Context(), request.Url)
+	shortenedURL, err := h.service.CreateShortURL(r.Context(), request.URL)
 	if err != nil {
 		http.Error(w, "Internal server error", http.StatusInternalServerError)
 		return
@@ -111,7 +111,7 @@ func (h *UrlHandler) ShortenUrl(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusCreated)
 
 	encoder := json.NewEncoder(w)
-	encoder.Encode(model.ApiShortenURLResponse{
-		Result: fmt.Sprintf("%s/%s", h.cfg.BaseUrl, shortenedUrl),
+	encoder.Encode(model.APIShortenURLResponse{
+		Result: fmt.Sprintf("%s/%s", h.cfg.BaseURL, shortenedURL),
 	})
 }

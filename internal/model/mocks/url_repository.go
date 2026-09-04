@@ -6,16 +6,16 @@ import (
 	"github.com/stretchr/testify/mock"
 )
 
-type MockUrlRepository struct {
+type MockURLRepository struct {
 	mock.Mock
 }
 
-func (m *MockUrlRepository) GetOriginalUrl(ctx context.Context, shortenedUrl string) (string, bool, error) {
-	args := m.Called(ctx, shortenedUrl)
+func (m *MockURLRepository) GetOriginalURL(ctx context.Context, shortenedURL string) (string, bool, error) {
+	args := m.Called(ctx, shortenedURL)
 	return args.String(0), args.Bool(1), args.Error(2)
 }
 
-func (m *MockUrlRepository) SetShortenedUrl(ctx context.Context, shortenedUrl string, originalUrl string) error {
-	args := m.Called(ctx, shortenedUrl, originalUrl)
+func (m *MockURLRepository) SetShortenedURL(ctx context.Context, shortenedURL string, originalURL string) error {
+	args := m.Called(ctx, shortenedURL, originalURL)
 	return args.Error(0)
 }

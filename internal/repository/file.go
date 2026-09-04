@@ -23,7 +23,7 @@ func NewFileRepository(cfg config.Config) *FileRepository {
 	}
 }
 
-func (r *FileRepository) SetShortenedUrl(ctx context.Context, shortenedUrl string, originalUrl string) error {
+func (r *FileRepository) SetShortenedURL(ctx context.Context, shortenedURL string, originalURL string) error {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 
@@ -44,8 +44,8 @@ func (r *FileRepository) SetShortenedUrl(ctx context.Context, shortenedUrl strin
 
 	found := false
 	for i, u := range urls {
-		if u.ShortUrl == shortenedUrl {
-			urls[i].OriginalUrl = originalUrl
+		if u.ShortURL == shortenedURL {
+			urls[i].OriginalURL = originalURL
 			found = true
 			break
 		}
@@ -54,8 +54,8 @@ func (r *FileRepository) SetShortenedUrl(ctx context.Context, shortenedUrl strin
 	if !found {
 		urls = append(urls, model.URL{
 			UUID:        "",
-			ShortUrl:    shortenedUrl,
-			OriginalUrl: originalUrl,
+			ShortURL:    shortenedURL,
+			OriginalURL: originalURL,
 		})
 	}
 
@@ -74,7 +74,7 @@ func (r *FileRepository) SetShortenedUrl(ctx context.Context, shortenedUrl strin
 	return nil
 }
 
-func (r *FileRepository) GetOriginalUrl(ctx context.Context, shortenedUrl string) (string, bool, error) {
+func (r *FileRepository) GetOriginalURL(ctx context.Context, shortenedURL string) (string, bool, error) {
 	r.mu.RLock()
 	defer r.mu.RUnlock()
 
@@ -96,8 +96,8 @@ func (r *FileRepository) GetOriginalUrl(ctx context.Context, shortenedUrl string
 	}
 
 	for _, u := range urls {
-		if u.ShortUrl == shortenedUrl {
-			return u.OriginalUrl, true, nil
+		if u.ShortURL == shortenedURL {
+			return u.OriginalURL, true, nil
 		}
 	}
 

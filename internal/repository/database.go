@@ -19,14 +19,14 @@ func NewDatabaseRepository(db *sqlx.DB) *DatabaseRepository {
 	}
 }
 
-func (r *DatabaseRepository) SetShortenedUrl(ctx context.Context, shortenedUrl string, originalUrl string) error {
+func (r *DatabaseRepository) SetShortenedURL(ctx context.Context, shortenedURL string, originalURL string) error {
 	query := `
 		INSERT INTO urls (short_url, original_url) 
 		VALUES ($1, $2)
 		ON CONFLICT (short_url) 
 		DO UPDATE SET original_url = EXCLUDED.original_url;`
 
-	_, err := r.db.ExecContext(ctx, query, shortenedUrl, originalUrl)
+	_, err := r.db.ExecContext(ctx, query, shortenedURL, originalURL)
 	if err != nil {
 		logger.Log.Errorf("failed to insert/update url in database: %v", err)
 		return err
@@ -35,11 +35,11 @@ func (r *DatabaseRepository) SetShortenedUrl(ctx context.Context, shortenedUrl s
 	return nil
 }
 
-func (r *DatabaseRepository) GetOriginalUrl(ctx context.Context, shortenedUrl string) (string, bool, error) {
+func (r *DatabaseRepository) GetOriginalURL(ctx context.Context, shortenedURL string) (string, bool, error) {
 	query := `SELECT original_url FROM urls WHERE short_url = $1 LIMIT 1;`
 
-	var originalUrl string
-	err := r.db.GetContext(ctx, &originalUrl, query, shortenedUrl)
+	var originalURL string
+	err := r.db.GetContext(ctx, &originalURL, query, shortenedURL)
 
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
@@ -50,5 +50,5 @@ func (r *DatabaseRepository) GetOriginalUrl(ctx context.Context, shortenedUrl st
 		return "", false, err
 	}
 
-	return originalUrl, true, nil
+	return originalURL, true, nil
 }

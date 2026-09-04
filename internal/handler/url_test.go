@@ -17,10 +17,10 @@ import (
 
 var testCfg = config.Config{
 	ServerAddr: ":8080",
-	BaseUrl:    "http://localhost:8080",
+	BaseURL:    "http://localhost:8080",
 }
 
-func TestUrlHandler_RedirectUrl(t *testing.T) {
+func TestURLHandler_RedirectURL(t *testing.T) {
 	type want struct {
 		code           int
 		response       string
@@ -30,47 +30,47 @@ func TestUrlHandler_RedirectUrl(t *testing.T) {
 	tests := []struct {
 		name         string
 		want         want
-		shortenedUrl string
-		setupMock    func(m *mocks.MockUrlService)
+		shortenedURL string
+		setupMock    func(m *mocks.MockURLService)
 	}{
 		{
 			name:         "positive test",
-			shortenedUrl: "4hvjC1",
+			shortenedURL: "4hvjC1",
 			want: want{
 				code:           http.StatusTemporaryRedirect,
 				contentType:    "text/plain",
 				response:       "",
 				LocationHeader: "https://yandex.ru",
 			},
-			setupMock: func(m *mocks.MockUrlService) {
-				m.On("GetOriginalUrl", mock.Anything, "4hvjC1").Return("https://yandex.ru", true, nil)
+			setupMock: func(m *mocks.MockURLService) {
+				m.On("GetOriginalURL", mock.Anything, "4hvjC1").Return("https://yandex.ru", true, nil)
 			},
 		},
 		{
 			name:         "negative test",
-			shortenedUrl: "unknown_id",
+			shortenedURL: "unknown_id",
 			want: want{
 				code:           http.StatusBadRequest,
 				contentType:    "text/plain",
 				response:       "Missing original URL",
 				LocationHeader: "",
 			},
-			setupMock: func(m *mocks.MockUrlService) {
-				m.On("GetOriginalUrl", mock.Anything, "unknown_id").Return("", false, nil)
+			setupMock: func(m *mocks.MockURLService) {
+				m.On("GetOriginalURL", mock.Anything, "unknown_id").Return("", false, nil)
 			},
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			mockService := new(mocks.MockUrlService)
+			mockService := new(mocks.MockURLService)
 			tt.setupMock(mockService)
 
-			h := NewUrlHandler(mockService, testCfg)
+			h := NewURLHandler(mockService, testCfg)
 
 			r := chi.NewRouter()
-			r.Get("/{id}", h.RedirectUrl)
+			r.Get("/{id}", h.RedirectURL)
 
-			request := httptest.NewRequest(http.MethodGet, "/"+tt.shortenedUrl, nil)
+			request := httptest.NewRequest(http.MethodGet, "/"+tt.shortenedURL, nil)
 			w := httptest.NewRecorder()
 
 			r.ServeHTTP(w, request)
@@ -96,7 +96,7 @@ func TestUrlHandler_RedirectUrl(t *testing.T) {
 	}
 }
 
-func TestUrlHandler_ShortUrl(t *testing.T) {
+func TestURLHandler_ShortURL(t *testing.T) {
 	type want struct {
 		code           int
 		contentType    string
@@ -108,7 +108,7 @@ func TestUrlHandler_ShortUrl(t *testing.T) {
 		body        string
 		contentType string
 		want        want
-		setupMock   func(m *mocks.MockUrlService)
+		setupMock   func(m *mocks.MockURLService)
 	}{
 		{
 			name:        "positive test",
@@ -117,10 +117,10 @@ func TestUrlHandler_ShortUrl(t *testing.T) {
 			want: want{
 				code:           http.StatusCreated,
 				contentType:    "text/plain",
-				expectedPrefix: testCfg.BaseUrl + "/4hvjC1",
+				expectedPrefix: testCfg.BaseURL + "/4hvjC1",
 			},
-			setupMock: func(m *mocks.MockUrlService) {
-				m.On("CreateShortUrl", mock.Anything, "https://yandex.ru").Return("4hvjC1", nil)
+			setupMock: func(m *mocks.MockURLService) {
+				m.On("CreateShortURL", mock.Anything, "https://yandex.ru").Return("4hvjC1", nil)
 			},
 		},
 		{
@@ -132,7 +132,7 @@ func TestUrlHandler_ShortUrl(t *testing.T) {
 				contentType:    "text/plain; charset=utf-8",
 				expectedPrefix: "Body is empty",
 			},
-			setupMock: func(m *mocks.MockUrlService) {},
+			setupMock: func(m *mocks.MockURLService) {},
 		},
 		{
 			name:        "negative test - unsupported content-type",
@@ -143,7 +143,7 @@ func TestUrlHandler_ShortUrl(t *testing.T) {
 				contentType:    "text/plain; charset=utf-8",
 				expectedPrefix: "Unsupported content-type",
 			},
-			setupMock: func(m *mocks.MockUrlService) {},
+			setupMock: func(m *mocks.MockURLService) {},
 		},
 	}
 
@@ -157,12 +157,12 @@ func TestUrlHandler_ShortUrl(t *testing.T) {
 
 			w := httptest.NewRecorder()
 
-			mockService := new(mocks.MockUrlService)
+			mockService := new(mocks.MockURLService)
 			tt.setupMock(mockService)
 
-			h := NewUrlHandler(mockService, testCfg)
+			h := NewURLHandler(mockService, testCfg)
 
-			h.ShortUrl(w, request)
+			h.ShortURL(w, request)
 
 			res := w.Result()
 			defer res.Body.Close()
@@ -181,7 +181,7 @@ func TestUrlHandler_ShortUrl(t *testing.T) {
 	}
 }
 
-func TestUrlHandler_ShortenUrl(t *testing.T) {
+func TestURLHandler_ShortenURL(t *testing.T) {
 	type want struct {
 		code           int
 		contentType    string
@@ -193,7 +193,7 @@ func TestUrlHandler_ShortenUrl(t *testing.T) {
 		body        string
 		contentType string
 		want        want
-		setupMock   func(m *mocks.MockUrlService)
+		setupMock   func(m *mocks.MockURLService)
 	}{
 		{
 			name:        "positive test",
@@ -202,10 +202,10 @@ func TestUrlHandler_ShortenUrl(t *testing.T) {
 			want: want{
 				code:           http.StatusCreated,
 				contentType:    "application/json",
-				expectedPrefix: testCfg.BaseUrl + "/4hvjC1",
+				expectedPrefix: testCfg.BaseURL + "/4hvjC1",
 			},
-			setupMock: func(m *mocks.MockUrlService) {
-				m.On("CreateShortUrl", mock.Anything, "https://yandex.ru").Return("4hvjC1", nil)
+			setupMock: func(m *mocks.MockURLService) {
+				m.On("CreateShortURL", mock.Anything, "https://yandex.ru").Return("4hvjC1", nil)
 			},
 		},
 	}
@@ -220,12 +220,12 @@ func TestUrlHandler_ShortenUrl(t *testing.T) {
 
 			w := httptest.NewRecorder()
 
-			mockService := new(mocks.MockUrlService)
+			mockService := new(mocks.MockURLService)
 			tt.setupMock(mockService)
 
-			h := NewUrlHandler(mockService, testCfg)
+			h := NewURLHandler(mockService, testCfg)
 
-			h.ShortenUrl(w, request)
+			h.ShortenURL(w, request)
 
 			res := w.Result()
 			defer res.Body.Close()

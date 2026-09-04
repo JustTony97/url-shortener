@@ -9,50 +9,50 @@ import (
 	"strconv"
 )
 
-type UrlRepository interface {
-	GetOriginalUrl(ctx context.Context, shortenedUrl string) (string, bool, error)
-	SetShortenedUrl(ctx context.Context, shortenedUrl string, originalUrl string) error
+type URLRepository interface {
+	GetOriginalURL(ctx context.Context, shortenedURL string) (string, bool, error)
+	SetShortenedURL(ctx context.Context, shortenedURL string, originalURL string) error
 }
 
-type UrlService struct {
-	repo UrlRepository
+type URLService struct {
+	repo URLRepository
 }
 
-func NewUrlService(r UrlRepository) *UrlService {
-	return &UrlService{repo: r}
+func NewURLService(r URLRepository) *URLService {
+	return &URLService{repo: r}
 }
 
-func (s *UrlService) GetOriginalUrl(ctx context.Context, shortenedUrl string) (string, bool, error) {
-	return s.repo.GetOriginalUrl(ctx, shortenedUrl)
+func (s *URLService) GetOriginalURL(ctx context.Context, shortenedURL string) (string, bool, error) {
+	return s.repo.GetOriginalURL(ctx, shortenedURL)
 }
 
-func (s *UrlService) CreateShortUrl(ctx context.Context, originalUrl string) (string, error) {
-	var shortenedUrl string
+func (s *URLService) CreateShortURL(ctx context.Context, originalURL string) (string, error) {
+	var shortenedURL string
 	var hashSalt = ""
 
 	for i := 0; i < 5; i++ {
 		hash := fnv.New32a()
-		_, err := hash.Write([]byte(originalUrl + hashSalt))
+		_, err := hash.Write([]byte(originalURL + hashSalt))
 		if err != nil {
 			return "", err
 		}
-		shortenedUrl = fmt.Sprintf("%x", hash.Sum32())
+		shortenedURL = fmt.Sprintf("%x", hash.Sum32())
 
-		url, exists, err := s.repo.GetOriginalUrl(ctx, shortenedUrl)
+		url, exists, err := s.repo.GetOriginalURL(ctx, shortenedURL)
 		if err != nil {
 			return "", err
 		}
 
 		if !exists {
-			err := s.repo.SetShortenedUrl(ctx, shortenedUrl, originalUrl)
+			err := s.repo.SetShortenedURL(ctx, shortenedURL, originalURL)
 			if err != nil {
 				return "", err
 			}
-			return shortenedUrl, nil
+			return shortenedURL, nil
 		}
 
-		if url == originalUrl {
-			return shortenedUrl, nil
+		if url == originalURL {
+			return shortenedURL, nil
 		}
 		hashSalt = strconv.Itoa(rand.Int())
 	}

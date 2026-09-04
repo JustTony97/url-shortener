@@ -1,5 +1,5 @@
 package model
 
-type ApiShortenURLResponse struct {
+type APIShortenURLResponse struct {
 	Result string `json:"result"`
 }

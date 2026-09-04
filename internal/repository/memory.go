@@ -16,18 +16,18 @@ func NewMemoryRepository() *MemoryRepository {
 	}
 }
 
-func (r *MemoryRepository) SetShortenedUrl(ctx context.Context, shortenedUrl string, originalUrl string) error {
+func (r *MemoryRepository) SetShortenedURL(ctx context.Context, shortenedURL string, originalURL string) error {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 
-	r.cache[shortenedUrl] = originalUrl
+	r.cache[shortenedURL] = originalURL
 	return nil
 }
 
-func (r *MemoryRepository) GetOriginalUrl(ctx context.Context, shortenedUrl string) (string, bool, error) {
+func (r *MemoryRepository) GetOriginalURL(ctx context.Context, shortenedURL string) (string, bool, error) {
 	r.mu.RLock()
 	defer r.mu.RUnlock()
 
-	originalUrl, ok := r.cache[shortenedUrl]
-	return originalUrl, ok, nil
+	originalURL, ok := r.cache[shortenedURL]
+	return originalURL, ok, nil
 }

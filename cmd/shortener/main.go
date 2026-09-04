@@ -61,13 +61,13 @@ func main() {
 	r := chi.NewRouter()
 	r.Use(middlewares.WithLogging)
 
-	service := service.NewUrlService(repo)
-	urlHandler := handler.NewUrlHandler(service, cfg)
+	service := service.NewURLService(repo)
+	urlHandler := handler.NewURLHandler(service, cfg)
 	baseHandler := handler.NewBaseHandler(db)
 
-	r.Post("/", middlewares.WithCompress(middlewares.WithDecompress(urlHandler.ShortUrl)))
-	r.Post("/api/shorten", middlewares.WithCompress(middlewares.WithDecompress(urlHandler.ShortenUrl)))
-	r.Get("/{id}", urlHandler.RedirectUrl)
+	r.Post("/", middlewares.WithCompress(middlewares.WithDecompress(urlHandler.ShortURL)))
+	r.Post("/api/shorten", middlewares.WithCompress(middlewares.WithDecompress(urlHandler.ShortenURL)))
+	r.Get("/{id}", urlHandler.RedirectURL)
 	r.Get("/ping", baseHandler.Healthcheck)
 
 	log.Printf("Starting listening on %s ...\n", cfg.ServerAddr)
