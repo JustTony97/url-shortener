@@ -8,6 +8,7 @@ import (
 	"math/rand"
 	"strconv"
 
+	"github.com/JustTony97/url-shortener.git/internal/config"
 	"github.com/JustTony97/url-shortener.git/internal/model"
 )
 
@@ -19,10 +20,11 @@ type URLRepository interface {
 
 type URLService struct {
 	repo URLRepository
+	cfg  config.Config
 }
 
-func NewURLService(r URLRepository) *URLService {
-	return &URLService{repo: r}
+func NewURLService(r URLRepository, c config.Config) *URLService {
+	return &URLService{repo: r, cfg: c}
 }
 
 func (s *URLService) GetOriginalURL(ctx context.Context, shortenedURL string) (string, bool, error) {
@@ -60,7 +62,7 @@ func (s *URLService) CreateShortURLs(ctx context.Context, reqItems []model.Batch
 
 		responseItems[i] = model.BatchResponseItem{
 			OriginalURL: reqItem.CorrelationID,
-			ShortURL:    shortHash,
+			ShortURL:    fmt.Sprintf("%s/%s", s.cfg.BaseURL, shortHash),
 		}
 
 		uniqueURLs[shortHash] = model.URL{

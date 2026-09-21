@@ -48,7 +48,6 @@ func (r *DatabaseRepository) SetShortenedURLs(ctx context.Context, items []model
 		logger.Log.Errorf("failed to batch insert/update urls in database: %v", err)
 		return err
 	}
-
 	return nil
 }
 

@@ -61,7 +61,7 @@ func main() {
 	r := chi.NewRouter()
 	r.Use(middlewares.WithLogging)
 
-	service := service.NewURLService(repo)
+	service := service.NewURLService(repo, cfg)
 	urlHandler := handler.NewURLHandler(service, cfg)
 	baseHandler := handler.NewBaseHandler(db)
 
