@@ -3,6 +3,7 @@ package mocks
 import (
 	"context"
 
+	"github.com/JustTony97/url-shortener.git/internal/model"
 	"github.com/stretchr/testify/mock"
 )
 
@@ -17,5 +18,10 @@ func (m *MockURLRepository) GetOriginalURL(ctx context.Context, shortenedURL str
 
 func (m *MockURLRepository) SetShortenedURL(ctx context.Context, shortenedURL string, originalURL string) error {
 	args := m.Called(ctx, shortenedURL, originalURL)
+	return args.Error(0)
+}
+
+func (m *MockURLRepository) SetShortenedURLs(ctx context.Context, items []model.URL) error {
+	args := m.Called(ctx, items)
 	return args.Error(0)
 }

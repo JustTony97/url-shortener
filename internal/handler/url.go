@@ -22,6 +22,7 @@ type URLHandler struct {
 type URLService interface {
 	GetOriginalURL(ctx context.Context, shortenedURL string) (string, bool, error)
 	CreateShortURL(ctx context.Context, originalURL string) (string, error)
+	CreateShortURLs(ctx context.Context, reqItems []model.BatchItemRequest) ([]model.BatchResponseItem, error)
 }
 
 func NewURLHandler(s URLService, c config.Config) *URLHandler {
@@ -114,4 +115,38 @@ func (h *URLHandler) ShortenURL(w http.ResponseWriter, r *http.Request) {
 	encoder.Encode(model.APIShortenURLResponse{
 		Result: fmt.Sprintf("%s/%s", h.cfg.BaseURL, shortenedURL),
 	})
+}
+
+func (h *URLHandler) ShortenURLs(w http.ResponseWriter, r *http.Request) {
+	contentType := r.Header.Get("Content-Type")
+	if contentType != "" && !strings.HasPrefix(contentType, "application/json") {
+		http.Error(w, "Unsupported content-type", http.StatusBadRequest)
+		return
+	}
+	decoder := json.NewDecoder(r.Body)
+	defer r.Body.Close()
+	var request model.APIShortenURLsRequest
+	err := decoder.Decode(&request)
+
+	if err != nil {
+		http.Error(w, "Failed to validate body", http.StatusBadRequest)
+		return
+	}
+
+	if len(request) == 0 {
+		http.Error(w, "Body is empty", http.StatusBadRequest)
+		return
+	}
+
+	savedItems, err := h.service.CreateShortURLs(r.Context(), request)
+	if err != nil {
+		http.Error(w, "Internal server error", http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusCreated)
+
+	encoder := json.NewEncoder(w)
+	encoder.Encode(savedItems)
 }

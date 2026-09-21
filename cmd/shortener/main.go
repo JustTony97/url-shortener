@@ -67,6 +67,7 @@ func main() {
 
 	r.Post("/", middlewares.WithCompress(middlewares.WithDecompress(urlHandler.ShortURL)))
 	r.Post("/api/shorten", middlewares.WithCompress(middlewares.WithDecompress(urlHandler.ShortenURL)))
+	r.Post("/api/shorten/batch", middlewares.WithCompress(middlewares.WithDecompress(urlHandler.ShortenURLs)))
 	r.Get("/{id}", urlHandler.RedirectURL)
 	r.Get("/ping", baseHandler.Healthcheck)
 

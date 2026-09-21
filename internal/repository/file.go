@@ -103,3 +103,56 @@ func (r *FileRepository) GetOriginalURL(ctx context.Context, shortenedURL string
 
 	return "", false, nil
 }
+
+func (r *FileRepository) SetShortenedURLs(ctx context.Context, items []model.URL) error {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
+	file, err := os.OpenFile(r.cfg.FileStoragePath, os.O_RDONLY|os.O_CREATE, 0666)
+	if err != nil {
+		logger.Log.Errorf("failed to open file for reading batch: %v", err)
+		return err
+	}
+
+	var currentURLs []model.URL
+	decoder := json.NewDecoder(file)
+	if err := decoder.Decode(&currentURLs); err != nil && err != io.EOF {
+		file.Close()
+		logger.Log.Errorf("failed to decode urls during batch: %v", err)
+		return err
+	}
+	file.Close()
+
+	batchMap := make(map[string]model.URL, len(items))
+	for _, item := range items {
+		batchMap[item.ShortURL] = item
+	}
+
+	for i, u := range currentURLs {
+		if newItem, exists := batchMap[u.ShortURL]; exists {
+			currentURLs[i].OriginalURL = newItem.OriginalURL
+			if newItem.UUID != "" {
+				currentURLs[i].UUID = newItem.UUID
+			}
+			delete(batchMap, u.ShortURL)
+		}
+	}
+
+	for _, newItem := range batchMap {
+		currentURLs = append(currentURLs, newItem)
+	}
+
+	data, err := json.MarshalIndent(currentURLs, "", "  ")
+	if err != nil {
+		logger.Log.Errorf("failed to marshal urls during batch: %v", err)
+		return err
+	}
+
+	err = os.WriteFile(r.cfg.FileStoragePath, data, 0644)
+	if err != nil {
+		logger.Log.Errorf("failed to write urls to file %s during batch: %v", r.cfg.FileStoragePath, err)
+		return err
+	}
+
+	return nil
+}

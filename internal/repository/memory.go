@@ -3,6 +3,8 @@ package repository
 import (
 	"context"
 	"sync"
+
+	"github.com/JustTony97/url-shortener.git/internal/model"
 )
 
 type MemoryRepository struct {
@@ -30,4 +32,15 @@ func (r *MemoryRepository) GetOriginalURL(ctx context.Context, shortenedURL stri
 
 	originalURL, ok := r.cache[shortenedURL]
 	return originalURL, ok, nil
+}
+
+func (r *MemoryRepository) SetShortenedURLs(ctx context.Context, items []model.URL) error {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
+	for _, item := range items {
+		r.cache[item.ShortURL] = item.OriginalURL
+	}
+
+	return nil
 }

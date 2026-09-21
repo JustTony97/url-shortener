@@ -6,6 +6,7 @@ import (
 	"errors"
 
 	"github.com/JustTony97/url-shortener.git/internal/logger"
+	"github.com/JustTony97/url-shortener.git/internal/model"
 	"github.com/jmoiron/sqlx"
 )
 
@@ -29,6 +30,22 @@ func (r *DatabaseRepository) SetShortenedURL(ctx context.Context, shortenedURL s
 	_, err := r.db.ExecContext(ctx, query, shortenedURL, originalURL)
 	if err != nil {
 		logger.Log.Errorf("failed to insert/update url in database: %v", err)
+		return err
+	}
+
+	return nil
+}
+
+func (r *DatabaseRepository) SetShortenedURLs(ctx context.Context, items []model.URL) error {
+	query := `
+		INSERT INTO urls (short_url, original_url) 
+		VALUES (:short_url, :original_url)
+		ON CONFLICT (short_url) 
+		DO UPDATE SET original_url = EXCLUDED.original_url;`
+
+	_, err := r.db.NamedExecContext(ctx, query, items)
+	if err != nil {
+		logger.Log.Errorf("failed to batch insert/update urls in database: %v", err)
 		return err
 	}
 
