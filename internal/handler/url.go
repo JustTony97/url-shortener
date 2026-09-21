@@ -3,6 +3,7 @@ package handler
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 
@@ -71,8 +72,19 @@ func (h *URLHandler) ShortURL(w http.ResponseWriter, r *http.Request) {
 
 	shortenedURL, err := h.service.CreateShortURL(r.Context(), originalURL)
 	if err != nil {
-		http.Error(w, "Internal server error", http.StatusInternalServerError)
-		return
+		var conflictErr *model.ErrConflictWithExistingURL
+		if errors.As(err, &conflictErr) {
+			w.Header().Set("Content-Type", "application/json")
+			w.WriteHeader(http.StatusConflict)
+			encoder := json.NewEncoder(w)
+			encoder.Encode(model.APIShortenURLResponse{
+				Result: fmt.Sprintf("%s/%s", h.cfg.BaseURL, conflictErr.ShortURL),
+			})
+			return
+		} else {
+			http.Error(w, "Internal server error", http.StatusInternalServerError)
+			return
+		}
 	}
 
 	w.Header().Set("Content-Type", "text/plain")
@@ -103,9 +115,21 @@ func (h *URLHandler) ShortenURL(w http.ResponseWriter, r *http.Request) {
 	}
 
 	shortenedURL, err := h.service.CreateShortURL(r.Context(), request.URL)
+
 	if err != nil {
-		http.Error(w, "Internal server error", http.StatusInternalServerError)
-		return
+		var conflictErr *model.ErrConflictWithExistingURL
+		if errors.As(err, &conflictErr) {
+			w.Header().Set("Content-Type", "application/json")
+			w.WriteHeader(http.StatusConflict)
+			encoder := json.NewEncoder(w)
+			encoder.Encode(model.APIShortenURLResponse{
+				Result: fmt.Sprintf("%s/%s", h.cfg.BaseURL, conflictErr.ShortURL),
+			})
+			return
+		} else {
+			http.Error(w, "Internal server error", http.StatusInternalServerError)
+			return
+		}
 	}
 
 	w.Header().Set("Content-Type", "application/json")

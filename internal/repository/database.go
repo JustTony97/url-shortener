@@ -21,15 +21,31 @@ func NewDatabaseRepository(db *sqlx.DB) *DatabaseRepository {
 }
 
 func (r *DatabaseRepository) SetShortenedURL(ctx context.Context, shortenedURL string, originalURL string) error {
-	query := `
+	queryInsert := `
 		INSERT INTO urls (short_url, original_url) 
-		VALUES ($1, $2)
-		ON CONFLICT (short_url) 
-		DO UPDATE SET original_url = EXCLUDED.original_url;`
+		VALUES ($1, $2);`
 
-	_, err := r.db.ExecContext(ctx, query, shortenedURL, originalURL)
+	_, err := r.db.ExecContext(ctx, queryInsert, shortenedURL, originalURL)
 	if err != nil {
-		logger.Log.Errorf("failed to insert/update url in database: %v", err)
+		var pgErr interface {
+			SQLState() string
+		}
+
+		if errors.As(err, &pgErr) && pgErr.SQLState() == "23505" {
+			querySelect := `SELECT short_url FROM urls WHERE original_url = $1;`
+			logger.Log.Infoln("EXISTING ", querySelect)
+			var existingShortURL string
+
+			selectErr := r.db.QueryRowContext(ctx, querySelect, originalURL).Scan(&existingShortURL)
+			if selectErr != nil {
+				logger.Log.Errorf("failed to fetch existing url after conflict: %v", selectErr)
+				return selectErr
+			}
+
+			return &model.ErrConflictWithExistingURL{ShortURL: existingShortURL}
+		}
+
+		logger.Log.Errorf("failed to insert url in database: %v", err)
 		return err
 	}
 
