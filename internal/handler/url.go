@@ -74,7 +74,7 @@ func (h *URLHandler) ShortURL(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		var conflictErr *model.ErrConflictWithExistingURL
 		if errors.As(err, &conflictErr) {
-			w.Header().Set("Content-Type", "application/json")
+			w.Header().Set("Content-Type", "text/plain")
 			w.WriteHeader(http.StatusConflict)
 			w.Write([]byte(fmt.Sprintf("%s/%s", h.cfg.BaseURL, conflictErr.ShortURL)))
 			return
@@ -118,7 +118,11 @@ func (h *URLHandler) ShortenURL(w http.ResponseWriter, r *http.Request) {
 		if errors.As(err, &conflictErr) {
 			w.Header().Set("Content-Type", "application/json")
 			w.WriteHeader(http.StatusConflict)
-			w.Write([]byte(fmt.Sprintf("%s/%s", h.cfg.BaseURL, conflictErr.ShortURL)))
+
+			encoder := json.NewEncoder(w)
+			encoder.Encode(model.APIShortenURLResponse{
+				Result: fmt.Sprintf("%s/%s", h.cfg.BaseURL, conflictErr.ShortURL),
+			})
 			return
 		} else {
 			http.Error(w, "Internal server error", http.StatusInternalServerError)
