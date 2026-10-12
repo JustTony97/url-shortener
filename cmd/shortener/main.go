@@ -69,11 +69,14 @@ func main() {
 	urlService := service.NewURLService(repo, cfg)
 	urlHandler := handler.NewURLHandler(urlService, cfg)
 	baseHandler := handler.NewBaseHandler(db)
+	authHandler := handler.NewAuthHandler(cfg)
+	authMW := middlewares.NewAuthMiddleware(cfg)
 
 	r.Post("/", middlewares.WithCompress(middlewares.WithDecompress(urlHandler.ShortURL)))
 	r.Post("/api/shorten", middlewares.WithCompress(middlewares.WithDecompress(urlHandler.ShortenURL)))
-	r.Post("/api/shorten/batch", middlewares.WithCompress(middlewares.WithDecompress(urlHandler.ShortenURLs)))
+	r.Post("/api/shorten/batch", middlewares.WithCompress(middlewares.WithDecompress(authMW.RequireAuth(urlHandler.ShortenURLs))))
 	r.Get("/{id}", urlHandler.RedirectURL)
+	r.Post("/login", authHandler.Login)
 
 	if db != nil {
 		r.Get("/ping", baseHandler.Healthcheck)

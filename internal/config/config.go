@@ -3,16 +3,19 @@ package config
 import (
 	"flag"
 	"fmt"
+	"time"
 
 	"github.com/caarlos0/env/v6"
 )
 
 type Config struct {
-	ServerAddr      string `env:"SERVER_ADDRESS"`
-	BaseURL         string `env:"BASE_URL"`
-	FileStoragePath string `env:"FILE_STORAGE_PATH"`
-	DatabaseDSN     string `env:"DATABASE_DSN"`
-	MigrationsPath  string `env:"MIGRATIONS_PATH"`
+	ServerAddr      string        `env:"SERVER_ADDRESS"`
+	BaseURL         string        `env:"BASE_URL"`
+	FileStoragePath string        `env:"FILE_STORAGE_PATH"`
+	DatabaseDSN     string        `env:"DATABASE_DSN"`
+	MigrationsPath  string        `env:"MIGRATIONS_PATH"`
+	JWTSecret       string        `env:"JWT_SECRET"`
+	JWTExp          time.Duration `env:"JWT_EXP"`
 }
 
 func Load() (Config, error) {
@@ -21,8 +24,10 @@ func Load() (Config, error) {
 	flag.StringVar(&cfg.ServerAddr, "a", ":8080", "Server address")
 	flag.StringVar(&cfg.BaseURL, "b", "http://localhost:8080", "Base URL for short links redirection")
 	flag.StringVar(&cfg.FileStoragePath, "f", "", "Path for file storage")
-	flag.StringVar(&cfg.DatabaseDSN, "d", "", "Database dsn")
+	flag.StringVar(&cfg.DatabaseDSN, "d", "postgresql://postgres:password@localhost:5432/postgres?sslmode=disable", "Database dsn")
 	flag.StringVar(&cfg.MigrationsPath, "m", "file://./migrations", "Migrations path")
+	flag.StringVar(&cfg.JWTSecret, "jwt-secret", "supersecretkey", "JWT Secret key")
+	flag.DurationVar(&cfg.JWTExp, "jwt-exp", 3*time.Hour, "JWT Token expiration duration")
 
 	flag.Parse()
 
