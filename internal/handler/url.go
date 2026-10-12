@@ -163,14 +163,10 @@ func (h *URLHandler) ShortenURLs(w http.ResponseWriter, r *http.Request) {
 	}
 
 	savedItems, err := h.service.CreateShortURLs(r.Context(), request)
+
 	if err != nil {
-		if err != nil {
-			if errors.Is(err, model.ErrConflictURL) {
-				http.Error(w, "One or more URLs already exist", http.StatusConflict)
-				return
-			}
-			logger.Log.Error(err)
-			http.Error(w, "Internal server error", http.StatusInternalServerError)
+		if errors.Is(err, model.ErrConflictURL) {
+			http.Error(w, "One or more URLs already exist", http.StatusConflict)
 			return
 		}
 		logger.Log.Error(err)
