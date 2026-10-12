@@ -32,17 +32,31 @@ func (s *URLService) GetOriginalURL(ctx context.Context, shortenedURL string) (s
 }
 
 func (s *URLService) CreateShortURL(ctx context.Context, originalURL string) (string, error) {
-	shortenedURL, err := s.generateShortURL(ctx, originalURL)
-	if err != nil {
-		return "", err
+	var hashSalt string
+	const attempts = 5
+
+	for a := 0; a < attempts; a++ {
+		shortenedURL, err := s.generateShortURL(originalURL, hashSalt)
+		if err != nil {
+			return "", err
+		}
+
+		err = s.repo.SetShortenedURL(ctx, shortenedURL, originalURL)
+		if err != nil {
+			if errors.Is(err, model.ErrHashCollision) {
+				hashSalt = strconv.Itoa(rand.Int())
+				continue
+			}
+			if errors.Is(err, model.ErrConflictURL) {
+				return shortenedURL, &model.ErrConflictWithExistingURL{ShortURL: shortenedURL}
+			}
+			return "", err
+		}
+
+		return shortenedURL, nil
 	}
 
-	err = s.repo.SetShortenedURL(ctx, shortenedURL, originalURL)
-	if err != nil {
-		return "", err
-	}
-
-	return shortenedURL, nil
+	return "", errors.New("failed to generate unique short url due to heavy collisions")
 }
 
 func (s *URLService) CreateShortURLs(ctx context.Context, reqItems []model.BatchItemRequest) ([]model.BatchResponseItem, error) {
@@ -51,11 +65,12 @@ func (s *URLService) CreateShortURLs(ctx context.Context, reqItems []model.Batch
 	}
 
 	responseItems := make([]model.BatchResponseItem, len(reqItems))
-
 	uniqueURLs := make(map[string]model.URL)
+	origToHash := make(map[string]string)
+	hashToOrig := make(map[string]string)
 
 	for i, reqItem := range reqItems {
-		shortHash, err := s.generateShortURL(ctx, reqItem.OriginalURL)
+		shortHash, err := s.resolveShortURL(reqItem.OriginalURL, origToHash, hashToOrig)
 		if err != nil {
 			return nil, fmt.Errorf("failed to process URL at index %d: %w", i, err)
 		}
@@ -76,37 +91,45 @@ func (s *URLService) CreateShortURLs(ctx context.Context, reqItems []model.Batch
 		dbItems = append(dbItems, u)
 	}
 
-	err := s.repo.SetShortenedURLs(ctx, dbItems)
-	if err != nil {
-		return nil, fmt.Errorf("failed to save batch: %w", err)
+	if err := s.repo.SetShortenedURLs(ctx, dbItems); err != nil {
+		return nil, err
 	}
 
 	return responseItems, nil
 }
 
-func (s *URLService) generateShortURL(ctx context.Context, originalURL string) (string, error) {
-	var shortenedURL string
-	var hashSalt = ""
-
-	for i := 0; i < 5; i++ {
-		hash := fnv.New32a()
-		_, err := hash.Write([]byte(originalURL + hashSalt))
-		if err != nil {
-			return "", err
-		}
-		shortenedURL = fmt.Sprintf("%x", hash.Sum32())
-
-		url, exists, err := s.repo.GetOriginalURL(ctx, shortenedURL)
-		if err != nil {
-			return "", err
-		}
-
-		if !exists || url == originalURL {
-			return shortenedURL, nil
-		}
-
-		hashSalt = strconv.Itoa(rand.Int())
+func (s *URLService) resolveShortURL(originalURL string, origToHash, hashToOrig map[string]string) (string, error) {
+	if existingHash, exists := origToHash[originalURL]; exists {
+		return existingHash, nil
 	}
 
-	return "", errors.New("failed to generate unique short url due to heavy collisions")
+	var hashSalt string
+	const attempts = 5
+
+	for a := 0; a < attempts; a++ {
+		shortHash, err := s.generateShortURL(originalURL, hashSalt)
+		if err != nil {
+			return "", err
+		}
+
+		if _, existsHash := hashToOrig[shortHash]; existsHash {
+			hashSalt = strconv.Itoa(rand.Int())
+			continue
+		}
+
+		origToHash[originalURL] = shortHash
+		hashToOrig[shortHash] = originalURL
+		return shortHash, nil
+	}
+
+	return "", fmt.Errorf("failed to generate unique URL after %d attempts", attempts)
+}
+
+func (s *URLService) generateShortURL(originalURL string, hashSalt string) (string, error) {
+	hash := fnv.New32a()
+	_, err := hash.Write([]byte(originalURL + hashSalt))
+	if err != nil {
+		return "", err
+	}
+	return fmt.Sprintf("%x", hash.Sum32()), nil
 }

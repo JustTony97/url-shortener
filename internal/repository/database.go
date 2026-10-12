@@ -7,7 +7,13 @@ import (
 
 	"github.com/JustTony97/url-shortener.git/internal/logger"
 	"github.com/JustTony97/url-shortener.git/internal/model"
+	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jmoiron/sqlx"
+)
+
+var (
+	shortURLConstraint    = "idx_urls_short_url"
+	originalURLConstraint = "idx_urls_original_url"
 )
 
 type DatabaseRepository struct {
@@ -21,30 +27,21 @@ func NewDatabaseRepository(db *sqlx.DB) *DatabaseRepository {
 }
 
 func (r *DatabaseRepository) SetShortenedURL(ctx context.Context, shortenedURL string, originalURL string) error {
-	queryInsert := `
+	query := `
 		INSERT INTO urls (short_url, original_url) 
 		VALUES ($1, $2);`
 
-	_, err := r.db.ExecContext(ctx, queryInsert, shortenedURL, originalURL)
+	_, err := r.db.ExecContext(ctx, query, shortenedURL, originalURL)
 	if err != nil {
-		var pgErr interface {
-			SQLState() string
-		}
-
-		if errors.As(err, &pgErr) && pgErr.SQLState() == "23505" {
-			querySelect := `SELECT short_url FROM urls WHERE original_url = $1;`
-			logger.Log.Infoln("EXISTING ", querySelect)
-			var existingShortURL string
-
-			selectErr := r.db.QueryRowContext(ctx, querySelect, originalURL).Scan(&existingShortURL)
-			if selectErr != nil {
-				logger.Log.Errorf("failed to fetch existing url after conflict: %v", selectErr)
-				return selectErr
+		var pgErr *pgconn.PgError
+		if errors.As(err, &pgErr) && pgErr.Code == "23505" {
+			switch pgErr.ConstraintName {
+			case originalURLConstraint:
+				return model.ErrHashCollision
+			case shortURLConstraint:
+				return model.ErrConflictURL
 			}
-
-			return &model.ErrConflictWithExistingURL{ShortURL: existingShortURL}
 		}
-
 		logger.Log.Errorf("failed to insert url in database: %v", err)
 		return err
 	}
@@ -53,17 +50,38 @@ func (r *DatabaseRepository) SetShortenedURL(ctx context.Context, shortenedURL s
 }
 
 func (r *DatabaseRepository) SetShortenedURLs(ctx context.Context, items []model.URL) error {
-	query := `
-		INSERT INTO urls (short_url, original_url) 
-		VALUES (:short_url, :original_url)
-		ON CONFLICT (short_url) 
-		DO UPDATE SET original_url = EXCLUDED.original_url;`
-
-	_, err := r.db.NamedExecContext(ctx, query, items)
+	tx, err := r.db.BeginTx(ctx, nil)
 	if err != nil {
-		logger.Log.Errorf("failed to batch insert/update urls in database: %v", err)
 		return err
 	}
+	defer tx.Rollback()
+
+	query := `INSERT INTO urls (short_url, original_url) VALUES ($1, $2);`
+
+	for _, item := range items {
+		_, err := tx.ExecContext(ctx, query, item.ShortURL, item.OriginalURL)
+		if err != nil {
+			var pgErr *pgconn.PgError
+			if errors.As(err, &pgErr) && pgErr.Code == "23505" {
+				switch pgErr.ConstraintName {
+				case originalURLConstraint:
+					return model.ErrHashCollision
+				case shortURLConstraint:
+					return model.ErrConflictURL
+				default:
+					logger.Log.Errorf("unexpected constraint violation: %v", err)
+					return err
+				}
+			}
+			logger.Log.Errorf("failed to batch insert url: %v", err)
+			return err
+		}
+	}
+
+	if err := tx.Commit(); err != nil {
+		return err
+	}
+
 	return nil
 }
 

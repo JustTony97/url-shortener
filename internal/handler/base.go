@@ -4,15 +4,17 @@ import (
 	"context"
 	"net/http"
 	"time"
-
-	"github.com/jmoiron/sqlx"
 )
 
-type BaseHandler struct {
-	db *sqlx.DB
+type DB interface {
+	PingContext(ctx context.Context) error
 }
 
-func NewBaseHandler(db *sqlx.DB) *BaseHandler {
+type BaseHandler struct {
+	db DB
+}
+
+func NewBaseHandler(db DB) *BaseHandler {
 	return &BaseHandler{db: db}
 }
 

@@ -12,6 +12,7 @@ type Config struct {
 	BaseURL         string `env:"BASE_URL"`
 	FileStoragePath string `env:"FILE_STORAGE_PATH"`
 	DatabaseDSN     string `env:"DATABASE_DSN"`
+	MigrationsPath  string `env:"MIGRATIONS_PATH"`
 }
 
 func Load() (Config, error) {
@@ -20,7 +21,8 @@ func Load() (Config, error) {
 	flag.StringVar(&cfg.ServerAddr, "a", ":8080", "Server address")
 	flag.StringVar(&cfg.BaseURL, "b", "http://localhost:8080", "Base URL for short links redirection")
 	flag.StringVar(&cfg.FileStoragePath, "f", "", "Path for file storage")
-	flag.StringVar(&cfg.DatabaseDSN, "d", "", "Database dsn")
+	flag.StringVar(&cfg.DatabaseDSN, "d", "postgresql://postgres:password@localhost:5432/postgres?sslmode=disable", "Database dsn")
+	flag.StringVar(&cfg.MigrationsPath, "m", "file://./migrations", "Migrations path")
 
 	flag.Parse()
 

@@ -8,6 +8,7 @@ import (
 	"io"
 
 	"github.com/JustTony97/url-shortener.git/internal/config"
+	"github.com/JustTony97/url-shortener.git/internal/logger"
 	"github.com/JustTony97/url-shortener.git/internal/model"
 	"github.com/go-chi/chi/v5"
 
@@ -147,7 +148,8 @@ func (h *URLHandler) ShortenURLs(w http.ResponseWriter, r *http.Request) {
 	}
 	decoder := json.NewDecoder(r.Body)
 	defer r.Body.Close()
-	var request model.APIShortenURLsRequest
+
+	var request []model.BatchItemRequest
 	err := decoder.Decode(&request)
 
 	if err != nil {
@@ -162,6 +164,16 @@ func (h *URLHandler) ShortenURLs(w http.ResponseWriter, r *http.Request) {
 
 	savedItems, err := h.service.CreateShortURLs(r.Context(), request)
 	if err != nil {
+		if err != nil {
+			if errors.Is(err, model.ErrConflictURL) {
+				http.Error(w, "One or more URLs already exist", http.StatusConflict)
+				return
+			}
+			logger.Log.Error(err)
+			http.Error(w, "Internal server error", http.StatusInternalServerError)
+			return
+		}
+		logger.Log.Error(err)
 		http.Error(w, "Internal server error", http.StatusInternalServerError)
 		return
 	}

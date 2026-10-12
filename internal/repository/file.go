@@ -42,22 +42,20 @@ func (r *FileRepository) SetShortenedURL(ctx context.Context, shortenedURL strin
 	}
 	file.Close()
 
-	found := false
-	for i, u := range urls {
+	for _, u := range urls {
+		if u.OriginalURL == originalURL {
+			return model.ErrHashCollision
+		}
 		if u.ShortURL == shortenedURL {
-			urls[i].OriginalURL = originalURL
-			found = true
-			break
+			return model.ErrConflictURL
 		}
 	}
 
-	if !found {
-		urls = append(urls, model.URL{
-			UUID:        "",
-			ShortURL:    shortenedURL,
-			OriginalURL: originalURL,
-		})
-	}
+	urls = append(urls, model.URL{
+		UUID:        "",
+		ShortURL:    shortenedURL,
+		OriginalURL: originalURL,
+	})
 
 	data, err := json.MarshalIndent(urls, "", "  ")
 	if err != nil {
@@ -123,23 +121,16 @@ func (r *FileRepository) SetShortenedURLs(ctx context.Context, items []model.URL
 	}
 	file.Close()
 
-	batchMap := make(map[string]model.URL, len(items))
 	for _, item := range items {
-		batchMap[item.ShortURL] = item
-	}
-
-	for i, u := range currentURLs {
-		if newItem, exists := batchMap[u.ShortURL]; exists {
-			currentURLs[i].OriginalURL = newItem.OriginalURL
-			if newItem.UUID != "" {
-				currentURLs[i].UUID = newItem.UUID
+		for _, u := range currentURLs {
+			if u.OriginalURL == item.OriginalURL {
+				return model.ErrHashCollision
 			}
-			delete(batchMap, u.ShortURL)
+			if u.ShortURL == item.ShortURL {
+				return model.ErrConflictURL
+			}
 		}
-	}
-
-	for _, newItem := range batchMap {
-		currentURLs = append(currentURLs, newItem)
+		currentURLs = append(currentURLs, item)
 	}
 
 	data, err := json.MarshalIndent(currentURLs, "", "  ")
