@@ -2,6 +2,7 @@ package handler
 
 import (
 	"encoding/json"
+	"fmt"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -263,7 +264,7 @@ func TestURLHandler_GetUserURLs(t *testing.T) {
 			setAuth: true,
 			userID:  "user_123",
 			mockData: []model.URL{
-				{OriginalURL: "https://yandex.ru", ShortURL: "http://localhost:8080/4hvjC1"},
+				{OriginalURL: "https://yandex.ru", ShortURL: "4hvjC1"},
 			},
 			expectedCode: http.StatusOK,
 			validateJSON: true,
@@ -315,7 +316,9 @@ func TestURLHandler_GetUserURLs(t *testing.T) {
 				require.Len(t, resp, len(tt.mockData))
 
 				assert.Equal(t, tt.mockData[0].OriginalURL, resp[0].OriginalURL)
-				assert.Equal(t, tt.mockData[0].ShortURL, resp[0].ShortURL)
+				expectedShortURL := fmt.Sprintf("%s/%s", testCfg.BaseURL, tt.mockData[0].ShortURL)
+				assert.Equal(t, expectedShortURL, resp[0].ShortURL)
+
 			}
 		})
 	}
