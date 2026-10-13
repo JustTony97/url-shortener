@@ -72,7 +72,7 @@ func main() {
 	authHandler := handler.NewAuthHandler(cfg)
 	authMW := middlewares.NewAuthMiddleware(cfg)
 
-	r.Post("/", middlewares.WithCompress(middlewares.WithDecompress(urlHandler.ShortURL)))
+	r.Post("/", middlewares.WithCompress(middlewares.WithDecompress(authMW.WithAuth((urlHandler.ShortURL)))))
 	r.Post("/api/shorten", middlewares.WithCompress(middlewares.WithDecompress(authMW.WithAuth(urlHandler.ShortenURL))))
 	r.Post("/api/shorten/batch", middlewares.WithCompress(middlewares.WithDecompress(authMW.WithAuth(urlHandler.ShortenURLs))))
 	r.Get("/{id}", urlHandler.RedirectURL)
