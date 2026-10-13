@@ -7,7 +7,8 @@ import (
 )
 
 type Repository interface {
-	SetShortenedURL(ctx context.Context, shortenedURL string, originalURL string) error
-	SetShortenedURLs(ctx context.Context, items []model.URL) error
+	SetShortenedURL(ctx context.Context, shortenedURL string, originalURL string, userID string) error
+	SetShortenedURLs(ctx context.Context, items []model.URL, userID string) error
 	GetOriginalURL(ctx context.Context, shortenedURL string) (string, bool, error)
+	GetUserURLs(ctx context.Context, userID string) ([]model.URL, error)
 }

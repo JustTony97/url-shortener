@@ -9,6 +9,7 @@ import (
 
 	"github.com/JustTony97/url-shortener.git/internal/config"
 	"github.com/JustTony97/url-shortener.git/internal/logger"
+	"github.com/JustTony97/url-shortener.git/internal/middlewares"
 	"github.com/JustTony97/url-shortener.git/internal/model"
 	"github.com/go-chi/chi/v5"
 
@@ -23,8 +24,9 @@ type URLHandler struct {
 
 type URLService interface {
 	GetOriginalURL(ctx context.Context, shortenedURL string) (string, bool, error)
-	CreateShortURL(ctx context.Context, originalURL string) (string, error)
-	CreateShortURLs(ctx context.Context, reqItems []model.BatchItemRequest) ([]model.BatchResponseItem, error)
+	CreateShortURL(ctx context.Context, originalURL string, userID string) (string, error)
+	CreateShortURLs(ctx context.Context, reqItems []model.BatchItemRequest, userID string) ([]model.BatchResponseItem, error)
+	GetUserURLs(ctx context.Context, userID string) ([]model.URL, error)
 }
 
 func NewURLHandler(s URLService, c config.Config) *URLHandler {
@@ -52,6 +54,12 @@ func (h *URLHandler) RedirectURL(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *URLHandler) ShortURL(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+	userID, ok := middlewares.GetUserIDFromContext(ctx)
+	if !ok {
+		http.Error(w, "unauthorized", http.StatusUnauthorized)
+		return
+	}
 	contentType := r.Header.Get("Content-Type")
 	if contentType != "" && !strings.HasPrefix(contentType, "text/plain") {
 		http.Error(w, "Unsupported content-type", http.StatusBadRequest)
@@ -71,7 +79,7 @@ func (h *URLHandler) ShortURL(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	shortenedURL, err := h.service.CreateShortURL(r.Context(), originalURL)
+	shortenedURL, err := h.service.CreateShortURL(r.Context(), originalURL, userID)
 	if err != nil {
 		var conflictErr *model.ErrConflictWithExistingURL
 		if errors.As(err, &conflictErr) {
@@ -92,6 +100,12 @@ func (h *URLHandler) ShortURL(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *URLHandler) ShortenURL(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+	userID, ok := middlewares.GetUserIDFromContext(ctx)
+	if !ok {
+		http.Error(w, "unauthorized", http.StatusUnauthorized)
+		return
+	}
 	contentType := r.Header.Get("Content-Type")
 	if contentType != "" && !strings.HasPrefix(contentType, "application/json") {
 		http.Error(w, "Unsupported content-type", http.StatusBadRequest)
@@ -112,7 +126,7 @@ func (h *URLHandler) ShortenURL(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	shortenedURL, err := h.service.CreateShortURL(r.Context(), request.URL)
+	shortenedURL, err := h.service.CreateShortURL(r.Context(), request.URL, userID)
 
 	if err != nil {
 		var conflictErr *model.ErrConflictWithExistingURL
@@ -141,6 +155,12 @@ func (h *URLHandler) ShortenURL(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *URLHandler) ShortenURLs(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+	userID, ok := middlewares.GetUserIDFromContext(ctx)
+	if !ok {
+		http.Error(w, "unauthorized", http.StatusUnauthorized)
+		return
+	}
 	contentType := r.Header.Get("Content-Type")
 	if contentType != "" && !strings.HasPrefix(contentType, "application/json") {
 		http.Error(w, "Unsupported content-type", http.StatusBadRequest)
@@ -162,7 +182,7 @@ func (h *URLHandler) ShortenURLs(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	savedItems, err := h.service.CreateShortURLs(r.Context(), request)
+	savedItems, err := h.service.CreateShortURLs(r.Context(), request, userID)
 
 	if err != nil {
 		if errors.Is(err, model.ErrConflictURL) {
@@ -179,4 +199,39 @@ func (h *URLHandler) ShortenURLs(w http.ResponseWriter, r *http.Request) {
 
 	encoder := json.NewEncoder(w)
 	encoder.Encode(savedItems)
+}
+
+func (h *URLHandler) GetUserURLs(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+	userID, ok := middlewares.GetUserIDFromContext(ctx)
+	if !ok {
+		http.Error(w, "unauthorized", http.StatusUnauthorized)
+		return
+	}
+
+	urls, err := h.service.GetUserURLs(ctx, userID)
+
+	if err != nil {
+		logger.Log.Errorf("failed to get user urls: %v", err)
+		http.Error(w, "internal server error", http.StatusInternalServerError)
+		return
+	}
+
+	if len(urls) == 0 {
+		w.WriteHeader(http.StatusNoContent)
+		return
+	}
+
+	response := make(model.APIUserShortenBatchResponse, 0, len(urls))
+	for _, url := range urls {
+		response = append(response, model.UserBatchResponseItem{
+			OriginalURL: url.OriginalURL,
+			ShortURL:    url.ShortURL,
+		})
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+	encoder := json.NewEncoder(w)
+	encoder.Encode(response)
 }

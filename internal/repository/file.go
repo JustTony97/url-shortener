@@ -3,12 +3,12 @@ package repository
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"io"
 	"os"
 	"sync"
 
 	"github.com/JustTony97/url-shortener.git/internal/config"
-	"github.com/JustTony97/url-shortener.git/internal/logger"
 	"github.com/JustTony97/url-shortener.git/internal/model"
 )
 
@@ -23,22 +23,20 @@ func NewFileRepository(cfg config.Config) *FileRepository {
 	}
 }
 
-func (r *FileRepository) SetShortenedURL(ctx context.Context, shortenedURL string, originalURL string) error {
+func (r *FileRepository) SetShortenedURL(ctx context.Context, shortenedURL string, originalURL string, userID string) error {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 
 	file, err := os.OpenFile(r.cfg.FileStoragePath, os.O_RDONLY|os.O_CREATE, 0666)
 	if err != nil {
-		logger.Log.Errorf("failed to open file for reading: %v", err)
-		return err
+		return fmt.Errorf("file repo: open for reading: %w", err)
 	}
 
 	var urls []model.URL
 	decoder := json.NewDecoder(file)
 	if err := decoder.Decode(&urls); err != nil && err != io.EOF {
 		file.Close()
-		logger.Log.Errorf("failed to decode urls: %v", err)
-		return err
+		return fmt.Errorf("file repo: decode json: %w", err)
 	}
 	file.Close()
 
@@ -55,18 +53,17 @@ func (r *FileRepository) SetShortenedURL(ctx context.Context, shortenedURL strin
 		UUID:        "",
 		ShortURL:    shortenedURL,
 		OriginalURL: originalURL,
+		UserID:      userID,
 	})
 
 	data, err := json.MarshalIndent(urls, "", "  ")
 	if err != nil {
-		logger.Log.Errorf("failed to marshal urls: %v", err)
-		return err
+		return fmt.Errorf("file repo: marshal json: %w", err)
 	}
 
 	err = os.WriteFile(r.cfg.FileStoragePath, data, 0644)
 	if err != nil {
-		logger.Log.Errorf("failed to write urls to file %s: %v", r.cfg.FileStoragePath, err)
-		return err
+		return fmt.Errorf("file repo: write file: %w", err)
 	}
 
 	return nil
@@ -78,8 +75,7 @@ func (r *FileRepository) GetOriginalURL(ctx context.Context, shortenedURL string
 
 	file, err := os.OpenFile(r.cfg.FileStoragePath, os.O_RDONLY|os.O_CREATE, 0666)
 	if err != nil {
-		logger.Log.Errorf("failed to open file: %v", err)
-		return "", false, err
+		return "", false, fmt.Errorf("file repo: open for read: %w", err)
 	}
 	defer file.Close()
 
@@ -89,8 +85,7 @@ func (r *FileRepository) GetOriginalURL(ctx context.Context, shortenedURL string
 		if err == io.EOF {
 			return "", false, nil
 		}
-		logger.Log.Errorf("failed to decode urls: %v", err)
-		return "", false, err
+		return "", false, fmt.Errorf("file repo: decode json: %w", err)
 	}
 
 	for _, u := range urls {
@@ -102,26 +97,26 @@ func (r *FileRepository) GetOriginalURL(ctx context.Context, shortenedURL string
 	return "", false, nil
 }
 
-func (r *FileRepository) SetShortenedURLs(ctx context.Context, items []model.URL) error {
+func (r *FileRepository) SetShortenedURLs(ctx context.Context, items []model.URL, userID string) error {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 
 	file, err := os.OpenFile(r.cfg.FileStoragePath, os.O_RDONLY|os.O_CREATE, 0666)
 	if err != nil {
-		logger.Log.Errorf("failed to open file for reading batch: %v", err)
-		return err
+		return fmt.Errorf("file repo: open for batch reading: %w", err)
 	}
 
 	var currentURLs []model.URL
 	decoder := json.NewDecoder(file)
 	if err := decoder.Decode(&currentURLs); err != nil && err != io.EOF {
 		file.Close()
-		logger.Log.Errorf("failed to decode urls during batch: %v", err)
-		return err
+		return fmt.Errorf("file repo: decode batch json: %w", err)
 	}
 	file.Close()
 
 	for _, item := range items {
+		item.UserID = userID
+
 		for _, u := range currentURLs {
 			if u.OriginalURL == item.OriginalURL {
 				return model.ErrHashCollision
@@ -135,15 +130,42 @@ func (r *FileRepository) SetShortenedURLs(ctx context.Context, items []model.URL
 
 	data, err := json.MarshalIndent(currentURLs, "", "  ")
 	if err != nil {
-		logger.Log.Errorf("failed to marshal urls during batch: %v", err)
-		return err
+		return fmt.Errorf("file repo: marshal batch json: %w", err)
 	}
 
 	err = os.WriteFile(r.cfg.FileStoragePath, data, 0644)
 	if err != nil {
-		logger.Log.Errorf("failed to write urls to file %s during batch: %v", r.cfg.FileStoragePath, err)
-		return err
+		return fmt.Errorf("file repo: write batch file: %w", err)
 	}
 
 	return nil
+}
+
+func (r *FileRepository) GetUserURLs(ctx context.Context, userID string) ([]model.URL, error) {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+
+	file, err := os.OpenFile(r.cfg.FileStoragePath, os.O_RDONLY|os.O_CREATE, 0666)
+	if err != nil {
+		return nil, fmt.Errorf("file repo: open for user selection: %w", err)
+	}
+	defer file.Close()
+
+	var allURLs []model.URL
+	decoder := json.NewDecoder(file)
+	if err := decoder.Decode(&allURLs); err != nil {
+		if err == io.EOF {
+			return nil, nil
+		}
+		return nil, fmt.Errorf("file repo: decode user urls: %w", err)
+	}
+
+	var userURLs []model.URL
+	for _, u := range allURLs {
+		if u.UserID == userID {
+			userURLs = append(userURLs, u)
+		}
+	}
+
+	return userURLs, nil
 }

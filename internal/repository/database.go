@@ -26,12 +26,12 @@ func NewDatabaseRepository(db *sqlx.DB) *DatabaseRepository {
 	}
 }
 
-func (r *DatabaseRepository) SetShortenedURL(ctx context.Context, shortenedURL string, originalURL string) error {
+func (r *DatabaseRepository) SetShortenedURL(ctx context.Context, shortenedURL string, originalURL string, userID string) error {
 	query := `
-		INSERT INTO urls (short_url, original_url) 
-		VALUES ($1, $2);`
+		INSERT INTO urls (short_url, original_url, user_id) 
+		VALUES ($1, $2, $3);`
 
-	_, err := r.db.ExecContext(ctx, query, shortenedURL, originalURL)
+	_, err := r.db.ExecContext(ctx, query, shortenedURL, originalURL, userID)
 	if err != nil {
 		var pgErr *pgconn.PgError
 		if errors.As(err, &pgErr) && pgErr.Code == "23505" {
@@ -49,17 +49,17 @@ func (r *DatabaseRepository) SetShortenedURL(ctx context.Context, shortenedURL s
 	return nil
 }
 
-func (r *DatabaseRepository) SetShortenedURLs(ctx context.Context, items []model.URL) error {
+func (r *DatabaseRepository) SetShortenedURLs(ctx context.Context, items []model.URL, userID string) error {
 	tx, err := r.db.BeginTx(ctx, nil)
 	if err != nil {
 		return err
 	}
 	defer tx.Rollback()
 
-	query := `INSERT INTO urls (short_url, original_url) VALUES ($1, $2);`
+	query := `INSERT INTO urls (short_url, original_url, user_id) VALUES ($1, $2, $3);`
 
 	for _, item := range items {
-		_, err := tx.ExecContext(ctx, query, item.ShortURL, item.OriginalURL)
+		_, err := tx.ExecContext(ctx, query, item.ShortURL, item.OriginalURL, userID)
 		if err != nil {
 			var pgErr *pgconn.PgError
 			if errors.As(err, &pgErr) && pgErr.Code == "23505" {
@@ -101,4 +101,19 @@ func (r *DatabaseRepository) GetOriginalURL(ctx context.Context, shortenedURL st
 	}
 
 	return originalURL, true, nil
+}
+
+func (r *DatabaseRepository) GetUserURLs(ctx context.Context, userID string) ([]model.URL, error) {
+	var urls []model.URL
+
+	query := `SELECT uuid, original_url, short_url FROM urls WHERE user_id = $1;`
+
+	err := r.db.SelectContext(ctx, &urls, query, userID)
+
+	if err != nil {
+		logger.Log.Error(err)
+		return nil, err
+	}
+
+	return urls, nil
 }

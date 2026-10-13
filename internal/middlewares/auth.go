@@ -9,7 +9,9 @@ import (
 	"github.com/golang-jwt/jwt/v4"
 )
 
-const userIDKey string = "userID"
+type key string
+
+const userIDKey key = "userID"
 
 type AuthMiddleware struct {
 	cfg config.Config
@@ -34,7 +36,7 @@ func (am *AuthMiddleware) RequireAuth(next http.HandlerFunc) http.HandlerFunc {
 			return []byte(am.cfg.JWTSecret), nil
 		})
 
-		if err != nil || !token.Valid {
+		if err != nil || !token.Valid || claims.UserID == "" {
 			w.WriteHeader(http.StatusUnauthorized)
 			return
 		}
@@ -43,7 +45,12 @@ func (am *AuthMiddleware) RequireAuth(next http.HandlerFunc) http.HandlerFunc {
 		next.ServeHTTP(w, r.WithContext(ctx))
 	})
 }
+
 func GetUserIDFromContext(ctx context.Context) (string, bool) {
 	userID, ok := ctx.Value(userIDKey).(string)
 	return userID, ok
+}
+
+func ContextWithUserID(ctx context.Context, userID string) context.Context {
+	return context.WithValue(ctx, userIDKey, userID)
 }

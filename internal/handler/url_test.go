@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"encoding/json"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -8,6 +9,8 @@ import (
 	"testing"
 
 	"github.com/JustTony97/url-shortener.git/internal/config"
+	"github.com/JustTony97/url-shortener.git/internal/middlewares"
+	"github.com/JustTony97/url-shortener.git/internal/model"
 	"github.com/JustTony97/url-shortener.git/internal/model/mocks"
 	"github.com/go-chi/chi/v5"
 	"github.com/stretchr/testify/assert"
@@ -120,7 +123,7 @@ func TestURLHandler_ShortURL(t *testing.T) {
 				expectedPrefix: testCfg.BaseURL + "/4hvjC1",
 			},
 			setupMock: func(m *mocks.MockURLService) {
-				m.On("CreateShortURL", mock.Anything, "https://yandex.ru").Return("4hvjC1", nil)
+				m.On("CreateShortURL", mock.Anything, "https://yandex.ru", mock.Anything).Return("4hvjC1", nil)
 			},
 		},
 		{
@@ -155,13 +158,15 @@ func TestURLHandler_ShortURL(t *testing.T) {
 				request.Header.Set("Content-Type", tt.contentType)
 			}
 
+			ctx := middlewares.ContextWithUserID(request.Context(), "test_user")
+			request = request.WithContext(ctx)
+
 			w := httptest.NewRecorder()
 
 			mockService := new(mocks.MockURLService)
 			tt.setupMock(mockService)
 
 			h := NewURLHandler(mockService, testCfg)
-
 			h.ShortURL(w, request)
 
 			res := w.Result()
@@ -175,7 +180,6 @@ func TestURLHandler_ShortURL(t *testing.T) {
 			responseString := string(bodyBytes)
 
 			assert.Contains(t, responseString, tt.want.expectedPrefix)
-
 			mockService.AssertExpectations(t)
 		})
 	}
@@ -205,7 +209,7 @@ func TestURLHandler_ShortenURL(t *testing.T) {
 				expectedPrefix: testCfg.BaseURL + "/4hvjC1",
 			},
 			setupMock: func(m *mocks.MockURLService) {
-				m.On("CreateShortURL", mock.Anything, "https://yandex.ru").Return("4hvjC1", nil)
+				m.On("CreateShortURL", mock.Anything, "https://yandex.ru", mock.Anything).Return("4hvjC1", nil)
 			},
 		},
 	}
@@ -218,13 +222,15 @@ func TestURLHandler_ShortenURL(t *testing.T) {
 				request.Header.Set("Content-Type", tt.contentType)
 			}
 
+			ctx := middlewares.ContextWithUserID(request.Context(), "test_user")
+			request = request.WithContext(ctx)
+
 			w := httptest.NewRecorder()
 
 			mockService := new(mocks.MockURLService)
 			tt.setupMock(mockService)
 
 			h := NewURLHandler(mockService, testCfg)
-
 			h.ShortenURL(w, request)
 
 			res := w.Result()
@@ -238,8 +244,79 @@ func TestURLHandler_ShortenURL(t *testing.T) {
 			responseString := string(bodyBytes)
 
 			assert.Contains(t, responseString, tt.want.expectedPrefix)
-
 			mockService.AssertExpectations(t)
+		})
+	}
+}
+
+func TestURLHandler_GetUserURLs(t *testing.T) {
+	tests := []struct {
+		name         string
+		setAuth      bool
+		userID       string
+		mockData     []model.URL
+		expectedCode int
+		validateJSON bool
+	}{
+		{
+			name:    "success case with records",
+			setAuth: true,
+			userID:  "user_123",
+			mockData: []model.URL{
+				{OriginalURL: "https://yandex.ru", ShortURL: "http://localhost:8080/4hvjC1"},
+			},
+			expectedCode: http.StatusOK,
+			validateJSON: true,
+		},
+		{
+			name:         "success case empty list",
+			setAuth:      true,
+			userID:       "user_empty",
+			mockData:     []model.URL{},
+			expectedCode: http.StatusNoContent,
+			validateJSON: false,
+		},
+		{
+			name:         "unauthorized case",
+			setAuth:      false,
+			expectedCode: http.StatusUnauthorized,
+			validateJSON: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			mockService := new(mocks.MockURLService)
+			if tt.setAuth {
+				mockService.On("GetUserURLs", mock.Anything, tt.userID).Return(tt.mockData, nil)
+			}
+
+			h := NewURLHandler(mockService, testCfg)
+
+			request := httptest.NewRequest(http.MethodGet, "/api/user/urls", nil)
+			if tt.setAuth {
+				ctx := middlewares.ContextWithUserID(request.Context(), tt.userID)
+				request = request.WithContext(ctx)
+			}
+
+			w := httptest.NewRecorder()
+			h.GetUserURLs(w, request)
+
+			res := w.Result()
+			defer res.Body.Close()
+
+			assert.Equal(t, tt.expectedCode, res.StatusCode)
+
+			if tt.validateJSON {
+				assert.Contains(t, res.Header.Get("Content-Type"), "application/json")
+				var resp model.APIUserShortenBatchResponse
+				err := json.NewDecoder(res.Body).Decode(&resp)
+				require.NoError(t, err)
+				require.Len(t, resp, len(tt.mockData))
+
+				assert.Equal(t, tt.mockData[0].OriginalURL, resp[0].OriginalURL)
+				assert.Equal(t, tt.mockData[0].ShortURL, resp[0].ShortURL)
+			}
 		})
 	}
 }

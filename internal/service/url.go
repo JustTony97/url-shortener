@@ -14,8 +14,9 @@ import (
 
 type URLRepository interface {
 	GetOriginalURL(ctx context.Context, shortenedURL string) (string, bool, error)
-	SetShortenedURL(ctx context.Context, shortenedURL string, originalURL string) error
-	SetShortenedURLs(ctx context.Context, items []model.URL) error
+	SetShortenedURL(ctx context.Context, shortenedURL string, originalURL string, userID string) error
+	SetShortenedURLs(ctx context.Context, items []model.URL, userID string) error
+	GetUserURLs(ctx context.Context, userID string) ([]model.URL, error)
 }
 
 type URLService struct {
@@ -31,7 +32,7 @@ func (s *URLService) GetOriginalURL(ctx context.Context, shortenedURL string) (s
 	return s.repo.GetOriginalURL(ctx, shortenedURL)
 }
 
-func (s *URLService) CreateShortURL(ctx context.Context, originalURL string) (string, error) {
+func (s *URLService) CreateShortURL(ctx context.Context, originalURL string, userID string) (string, error) {
 	var hashSalt string
 	const attempts = 5
 
@@ -41,7 +42,7 @@ func (s *URLService) CreateShortURL(ctx context.Context, originalURL string) (st
 			return "", err
 		}
 
-		err = s.repo.SetShortenedURL(ctx, shortenedURL, originalURL)
+		err = s.repo.SetShortenedURL(ctx, shortenedURL, originalURL, userID)
 		if err != nil {
 			if errors.Is(err, model.ErrHashCollision) {
 				hashSalt = strconv.Itoa(rand.Int())
@@ -59,7 +60,7 @@ func (s *URLService) CreateShortURL(ctx context.Context, originalURL string) (st
 	return "", errors.New("failed to generate unique short url due to heavy collisions")
 }
 
-func (s *URLService) CreateShortURLs(ctx context.Context, reqItems []model.BatchItemRequest) ([]model.BatchResponseItem, error) {
+func (s *URLService) CreateShortURLs(ctx context.Context, reqItems []model.BatchItemRequest, userID string) ([]model.BatchResponseItem, error) {
 	if len(reqItems) == 0 {
 		return nil, nil
 	}
@@ -91,7 +92,7 @@ func (s *URLService) CreateShortURLs(ctx context.Context, reqItems []model.Batch
 		dbItems = append(dbItems, u)
 	}
 
-	if err := s.repo.SetShortenedURLs(ctx, dbItems); err != nil {
+	if err := s.repo.SetShortenedURLs(ctx, dbItems, userID); err != nil {
 		return nil, err
 	}
 
@@ -132,4 +133,8 @@ func (s *URLService) generateShortURL(originalURL string, hashSalt string) (stri
 		return "", err
 	}
 	return fmt.Sprintf("%x", hash.Sum32()), nil
+}
+
+func (s *URLService) GetUserURLs(ctx context.Context, userID string) ([]model.URL, error) {
+	return s.repo.GetUserURLs(ctx, userID)
 }
