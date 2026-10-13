@@ -51,19 +51,6 @@ func (am *AuthMiddleware) WithAuth(next http.HandlerFunc) http.HandlerFunc {
 	})
 }
 
-func (am *AuthMiddleware) RequireAuth(next http.HandlerFunc) http.HandlerFunc {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		uid := am.getUserIDFromCookie(r)
-		if uid == "" {
-			w.WriteHeader(http.StatusUnauthorized)
-			return
-		}
-
-		ctx := context.WithValue(r.Context(), userIDKey, uid)
-		next.ServeHTTP(w, r.WithContext(ctx))
-	})
-}
-
 func (am *AuthMiddleware) getUserIDFromCookie(r *http.Request) string {
 	cookie, err := r.Cookie("Authorization")
 	if err != nil {
