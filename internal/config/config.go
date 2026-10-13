@@ -24,7 +24,7 @@ func Load() (Config, error) {
 	flag.StringVar(&cfg.ServerAddr, "a", ":8080", "Server address")
 	flag.StringVar(&cfg.BaseURL, "b", "http://localhost:8080", "Base URL for short links redirection")
 	flag.StringVar(&cfg.FileStoragePath, "f", "", "Path for file storage")
-	flag.StringVar(&cfg.DatabaseDSN, "d", "postgresql://postgres:password@localhost:5432/postgres?sslmode=disable", "Database dsn")
+	flag.StringVar(&cfg.DatabaseDSN, "d", "", "Database dsn")
 	flag.StringVar(&cfg.MigrationsPath, "m", "file://./migrations", "Migrations path")
 	flag.StringVar(&cfg.JWTSecret, "jwt-secret", "supersecretkey", "JWT Secret key")
 	flag.DurationVar(&cfg.JWTExp, "jwt-exp", 3*time.Hour, "JWT Token expiration duration")
