@@ -226,7 +226,7 @@ func (h *URLHandler) GetUserURLs(w http.ResponseWriter, r *http.Request) {
 	for _, url := range urls {
 		response = append(response, model.UserBatchResponseItem{
 			OriginalURL: url.OriginalURL,
-			ShortURL:    url.ShortURL,
+			ShortURL:    fmt.Sprintf("%s/%s", h.cfg.BaseURL, url.ShortURL),
 		})
 	}
 
