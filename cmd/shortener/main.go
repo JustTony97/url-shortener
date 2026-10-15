@@ -3,13 +3,16 @@ package main
 import (
 	"log"
 	"net/http"
+	"time"
 
 	"github.com/JustTony97/url-shortener.git/internal/config"
 	"github.com/JustTony97/url-shortener.git/internal/handler"
 	"github.com/JustTony97/url-shortener.git/internal/logger"
 	"github.com/JustTony97/url-shortener.git/internal/middlewares"
+	"github.com/JustTony97/url-shortener.git/internal/model"
 	"github.com/JustTony97/url-shortener.git/internal/repository"
 	"github.com/JustTony97/url-shortener.git/internal/service"
+	"github.com/JustTony97/url-shortener.git/internal/worker"
 	"github.com/go-chi/chi/v5"
 	"github.com/golang-migrate/migrate/v4"
 	"github.com/golang-migrate/migrate/v4/database/postgres"
@@ -54,7 +57,6 @@ func main() {
 		defer m.Close()
 
 		repo = repository.NewDatabaseRepository(db)
-
 	} else if cfg.FileStoragePath != "" {
 		logger.Log.Infof("Using file repository")
 		repo = repository.NewFileRepository(cfg)
@@ -63,10 +65,18 @@ func main() {
 		repo = repository.NewMemoryRepository()
 	}
 
+	queueCapacity := 1000
+	batchSize := 100
+	batchTimeout := 1 * time.Second
+
+	deleteTasksCh := make(chan model.DeleteURLTask, queueCapacity)
+	worker := worker.NewURLBatchWorker(deleteTasksCh, batchSize, batchTimeout, repo)
+	go worker.StartWorker()
+
 	r := chi.NewRouter()
 	r.Use(middlewares.WithLogging)
 
-	urlService := service.NewURLService(repo, cfg)
+	urlService := service.NewURLService(repo, cfg, deleteTasksCh)
 	urlHandler := handler.NewURLHandler(urlService, cfg)
 	baseHandler := handler.NewBaseHandler(db)
 	authHandler := handler.NewAuthHandler(cfg)
@@ -78,6 +88,7 @@ func main() {
 	r.Get("/{id}", urlHandler.RedirectURL)
 	r.Get("/api/user/urls", middlewares.WithCompress(middlewares.WithDecompress(authMW.WithAuth(urlHandler.GetUserURLs))))
 	r.Post("/login", authHandler.Login)
+	r.Delete("/api/user/urls", authMW.WithAuth(urlHandler.DeleteUserURLs))
 
 	if db != nil {
 		r.Get("/ping", baseHandler.Healthcheck)

@@ -9,6 +9,7 @@ import (
 	"github.com/JustTony97/url-shortener.git/internal/model"
 	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jmoiron/sqlx"
+	"github.com/lib/pq"
 )
 
 var (
@@ -116,4 +117,25 @@ func (r *DatabaseRepository) GetUserURLs(ctx context.Context, userID string) ([]
 	}
 
 	return urls, nil
+}
+
+func (r *DatabaseRepository) DeleteUserURLs(ctx context.Context, userIDs []string, shortURLs []string) error {
+	if len(shortURLs) == 0 {
+		return nil
+	}
+
+	query := `
+		UPDATE urls 
+		SET is_deleted = true 
+		FROM unnest($1::text[], $2::text[]) AS batch(user_id, short_url)
+		WHERE urls.user_id = batch.user_id AND urls.short_url = batch.short_url;
+	`
+	_, err := r.db.ExecContext(ctx, query, pq.Array(userIDs), pq.Array(shortURLs))
+
+	if err != nil {
+		logger.Log.Error(err)
+		return err
+	}
+
+	return nil
 }

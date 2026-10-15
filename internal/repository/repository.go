@@ -11,4 +11,5 @@ type Repository interface {
 	SetShortenedURLs(ctx context.Context, items []model.URL, userID string) error
 	GetOriginalURL(ctx context.Context, shortenedURL string) (string, bool, error)
 	GetUserURLs(ctx context.Context, userID string) ([]model.URL, error)
+	DeleteUserURLs(ctx context.Context, userIDs []string, shortURLs []string) error
 }

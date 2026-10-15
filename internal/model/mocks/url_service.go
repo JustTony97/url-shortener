@@ -36,3 +36,7 @@ func (m *MockURLService) GetUserURLs(ctx context.Context, userID string) ([]mode
 	}
 	return args.Get(0).([]model.URL), args.Error(1)
 }
+
+func (m *MockURLService) DeleteUserURLs(ctx context.Context, userID string, shortURLs []string) {
+	m.Called(ctx, userID, shortURLs)
+}

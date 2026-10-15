@@ -17,15 +17,17 @@ type URLRepository interface {
 	SetShortenedURL(ctx context.Context, shortenedURL string, originalURL string, userID string) error
 	SetShortenedURLs(ctx context.Context, items []model.URL, userID string) error
 	GetUserURLs(ctx context.Context, userID string) ([]model.URL, error)
+	DeleteUserURLs(ctx context.Context, userIDs []string, shortURLs []string) error
 }
 
 type URLService struct {
-	repo URLRepository
-	cfg  config.Config
+	repo          URLRepository
+	cfg           config.Config
+	deleteTasksCh chan<- model.DeleteURLTask
 }
 
-func NewURLService(r URLRepository, c config.Config) *URLService {
-	return &URLService{repo: r, cfg: c}
+func NewURLService(r URLRepository, c config.Config, ch chan<- model.DeleteURLTask) *URLService {
+	return &URLService{repo: r, cfg: c, deleteTasksCh: ch}
 }
 
 func (s *URLService) GetOriginalURL(ctx context.Context, shortenedURL string) (string, bool, error) {
@@ -137,4 +139,11 @@ func (s *URLService) generateShortURL(originalURL string, hashSalt string) (stri
 
 func (s *URLService) GetUserURLs(ctx context.Context, userID string) ([]model.URL, error) {
 	return s.repo.GetUserURLs(ctx, userID)
+}
+
+func (s *URLService) DeleteUserURLs(ctx context.Context, userID string, shortURLs []string) {
+	s.deleteTasksCh <- model.DeleteURLTask{
+		UserID:    userID,
+		ShortURLs: shortURLs,
+	}
 }

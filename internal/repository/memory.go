@@ -66,3 +66,26 @@ func (r *MemoryRepository) GetUserURLs(ctx context.Context, userID string) ([]mo
 
 	return userURLs, nil
 }
+
+func (r *MemoryRepository) DeleteUserURLs(ctx context.Context, userIDs []string, shortURLs []string) error {
+	if len(shortURLs) == 0 {
+		return nil
+	}
+
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
+	for i := 0; i < len(shortURLs); i++ {
+		sURL := shortURLs[i]
+		uID := userIDs[i]
+
+		if urlData, exists := r.cache[sURL]; exists {
+			if urlData.UserID == uID {
+				urlData.IsDeleted = true
+				r.cache[sURL] = urlData
+			}
+		}
+	}
+
+	return nil
+}

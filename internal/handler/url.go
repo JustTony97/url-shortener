@@ -27,6 +27,7 @@ type URLService interface {
 	CreateShortURL(ctx context.Context, originalURL string, userID string) (string, error)
 	CreateShortURLs(ctx context.Context, reqItems []model.BatchItemRequest, userID string) ([]model.BatchResponseItem, error)
 	GetUserURLs(ctx context.Context, userID string) ([]model.URL, error)
+	DeleteUserURLs(ctx context.Context, userID string, shortURLs []string)
 }
 
 func NewURLHandler(s URLService, c config.Config) *URLHandler {
@@ -234,4 +235,27 @@ func (h *URLHandler) GetUserURLs(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusOK)
 	encoder := json.NewEncoder(w)
 	encoder.Encode(response)
+}
+
+func (h *URLHandler) DeleteUserURLs(w http.ResponseWriter, r *http.Request) {
+	decoder := json.NewDecoder(r.Body)
+	defer r.Body.Close()
+
+	var request []string
+	err := decoder.Decode(&request)
+
+	if err != nil {
+		http.Error(w, "Failed to validate body", http.StatusBadRequest)
+		return
+	}
+
+	ctx := r.Context()
+	userID, ok := middlewares.GetUserIDFromContext(ctx)
+	if !ok {
+		http.Error(w, "unauthorized", http.StatusUnauthorized)
+		return
+	}
+
+	h.service.DeleteUserURLs(ctx, userID, request)
+	w.WriteHeader(http.StatusAccepted)
 }
