@@ -1,3 +1,103 @@
 package main
 
-func main() {}
+import (
+	"log"
+	"net/http"
+	"time"
+
+	"github.com/JustTony97/url-shortener.git/internal/config"
+	"github.com/JustTony97/url-shortener.git/internal/handler"
+	"github.com/JustTony97/url-shortener.git/internal/logger"
+	"github.com/JustTony97/url-shortener.git/internal/middlewares"
+	"github.com/JustTony97/url-shortener.git/internal/model"
+	"github.com/JustTony97/url-shortener.git/internal/repository"
+	"github.com/JustTony97/url-shortener.git/internal/service"
+	"github.com/JustTony97/url-shortener.git/internal/worker"
+	"github.com/go-chi/chi/v5"
+	"github.com/golang-migrate/migrate/v4"
+	"github.com/golang-migrate/migrate/v4/database/postgres"
+	_ "github.com/golang-migrate/migrate/v4/source/file"
+	_ "github.com/jackc/pgx/v5/stdlib"
+	"github.com/jmoiron/sqlx"
+)
+
+func main() {
+	logger.InitLogger()
+	var db *sqlx.DB
+
+	cfg, err := config.Load()
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	var repo repository.Repository
+
+	if cfg.DatabaseDSN != "" {
+		db, err = sqlx.Connect("pgx", cfg.DatabaseDSN)
+		if err != nil {
+			logger.Log.Fatalf("Failed to connect to database: %v", err)
+		}
+		defer db.Close()
+
+		logger.Log.Infof("Using db repository")
+
+		driver, err := postgres.WithInstance(db.DB, &postgres.Config{})
+		if err != nil {
+			logger.Log.Fatalf("Failed to create migrate driver: %v", err)
+		}
+
+		m, err := migrate.NewWithDatabaseInstance(cfg.MigrationsPath, "postgres", driver)
+		if err != nil {
+			logger.Log.Fatalf("Failed to initialize migrations: %v", err)
+		}
+
+		if err := m.Up(); err != nil && err != migrate.ErrNoChange {
+			logger.Log.Fatalf("Failed to run migrations: %v", err)
+		}
+		defer m.Close()
+
+		repo = repository.NewDatabaseRepository(db)
+	} else if cfg.FileStoragePath != "" {
+		logger.Log.Infof("Using file repository")
+		repo = repository.NewFileRepository(cfg)
+	} else {
+		logger.Log.Info("Using memory repository")
+		repo = repository.NewMemoryRepository()
+	}
+
+	queueCapacity := 1000
+	batchSize := 100
+	batchTimeout := 1 * time.Second
+
+	deleteTasksCh := make(chan model.DeleteURLTask, queueCapacity)
+	worker := worker.NewURLBatchWorker(deleteTasksCh, batchSize, batchTimeout, repo)
+	go worker.StartWorker()
+
+	r := chi.NewRouter()
+	r.Use(middlewares.WithLogging)
+
+	urlService := service.NewURLService(repo, cfg, deleteTasksCh)
+	urlHandler := handler.NewURLHandler(urlService, cfg)
+	baseHandler := handler.NewBaseHandler(db)
+	authHandler := handler.NewAuthHandler(cfg)
+	authMW := middlewares.NewAuthMiddleware(cfg)
+
+	r.Post("/", middlewares.WithCompress(middlewares.WithDecompress(authMW.WithAuth((urlHandler.ShortURL)))))
+	r.Post("/api/shorten", middlewares.WithCompress(middlewares.WithDecompress(authMW.WithAuth(urlHandler.ShortenURL))))
+	r.Post("/api/shorten/batch", middlewares.WithCompress(middlewares.WithDecompress(authMW.WithAuth(urlHandler.ShortenURLs))))
+	r.Get("/{id}", urlHandler.RedirectURL)
+	r.Get("/api/user/urls", middlewares.WithCompress(middlewares.WithDecompress(authMW.WithAuth(urlHandler.GetUserURLs))))
+	r.Post("/login", authHandler.Login)
+	r.Delete("/api/user/urls", authMW.WithAuth(urlHandler.DeleteUserURLs))
+
+	if db != nil {
+		r.Get("/ping", baseHandler.Healthcheck)
+	}
+
+	log.Printf("Starting listening on %s ...\n", cfg.ServerAddr)
+	err = http.ListenAndServe(cfg.ServerAddr, r)
+
+	if err != nil {
+		logger.Log.Fatal(err)
+	}
+}
