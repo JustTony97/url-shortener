@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"errors"
+	"fmt"
 
 	"github.com/JustTony97/url-shortener.git/internal/logger"
 	"github.com/JustTony97/url-shortener.git/internal/model"
@@ -86,22 +87,20 @@ func (r *DatabaseRepository) SetShortenedURLs(ctx context.Context, items []model
 	return nil
 }
 
-func (r *DatabaseRepository) GetOriginalURL(ctx context.Context, shortenedURL string) (string, bool, error) {
-	query := `SELECT original_url FROM urls WHERE short_url = $1 LIMIT 1;`
+func (r *DatabaseRepository) GetOriginalURL(ctx context.Context, shortenedURL string) (*model.URL, error) {
+	query := `SELECT short_url, is_deleted FROM urls WHERE short_url = $1 LIMIT 1;`
 
-	var originalURL string
-	err := r.db.GetContext(ctx, &originalURL, query, shortenedURL)
+	var urlData model.URL
+	err := r.db.GetContext(ctx, &urlData, query, shortenedURL)
 
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
-			return "", false, nil
+			return nil, nil
 		}
-
-		logger.Log.Errorf("failed to get original url from database: %v", err)
-		return "", false, err
+		return nil, fmt.Errorf("repository: failed to get url state: %w", err)
 	}
 
-	return originalURL, true, nil
+	return &urlData, nil
 }
 
 func (r *DatabaseRepository) GetUserURLs(ctx context.Context, userID string) ([]model.URL, error) {

@@ -11,9 +11,12 @@ type MockURLRepository struct {
 	mock.Mock
 }
 
-func (m *MockURLRepository) GetOriginalURL(ctx context.Context, shortenedURL string) (string, bool, error) {
+func (m *MockURLRepository) GetOriginalURL(ctx context.Context, shortenedURL string) (*model.URL, error) {
 	args := m.Called(ctx, shortenedURL)
-	return args.String(0), args.Bool(1), args.Error(2)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
+	}
+	return args.Get(0).(*model.URL), args.Error(1)
 }
 
 func (m *MockURLRepository) SetShortenedURL(ctx context.Context, shortenedURL string, originalURL string, userID string) error {

@@ -13,7 +13,7 @@ import (
 )
 
 type URLRepository interface {
-	GetOriginalURL(ctx context.Context, shortenedURL string) (string, bool, error)
+	GetOriginalURL(ctx context.Context, shortenedURL string) (*model.URL, error)
 	SetShortenedURL(ctx context.Context, shortenedURL string, originalURL string, userID string) error
 	SetShortenedURLs(ctx context.Context, items []model.URL, userID string) error
 	GetUserURLs(ctx context.Context, userID string) ([]model.URL, error)
@@ -30,7 +30,7 @@ func NewURLService(r URLRepository, c config.Config, ch chan<- model.DeleteURLTa
 	return &URLService{repo: r, cfg: c, deleteTasksCh: ch}
 }
 
-func (s *URLService) GetOriginalURL(ctx context.Context, shortenedURL string) (string, bool, error) {
+func (s *URLService) GetOriginalURL(ctx context.Context, shortenedURL string) (*model.URL, error) {
 	return s.repo.GetOriginalURL(ctx, shortenedURL)
 }
 

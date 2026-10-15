@@ -69,13 +69,13 @@ func (r *FileRepository) SetShortenedURL(ctx context.Context, shortenedURL strin
 	return nil
 }
 
-func (r *FileRepository) GetOriginalURL(ctx context.Context, shortenedURL string) (string, bool, error) {
+func (r *FileRepository) GetOriginalURL(ctx context.Context, shortenedURL string) (*model.URL, error) {
 	r.mu.RLock()
 	defer r.mu.RUnlock()
 
 	file, err := os.OpenFile(r.cfg.FileStoragePath, os.O_RDONLY|os.O_CREATE, 0666)
 	if err != nil {
-		return "", false, fmt.Errorf("file repo: open for read: %w", err)
+		return nil, fmt.Errorf("file repo: open for read: %w", err)
 	}
 	defer file.Close()
 
@@ -83,18 +83,18 @@ func (r *FileRepository) GetOriginalURL(ctx context.Context, shortenedURL string
 	decoder := json.NewDecoder(file)
 	if err := decoder.Decode(&urls); err != nil {
 		if err == io.EOF {
-			return "", false, nil
+			return nil, nil
 		}
-		return "", false, fmt.Errorf("file repo: decode json: %w", err)
+		return nil, fmt.Errorf("file repo: decode json: %w", err)
 	}
 
 	for _, u := range urls {
 		if u.ShortURL == shortenedURL {
-			return u.OriginalURL, true, nil
+			return &u, nil
 		}
 	}
 
-	return "", false, nil
+	return nil, nil
 }
 
 func (r *FileRepository) SetShortenedURLs(ctx context.Context, items []model.URL, userID string) error {
