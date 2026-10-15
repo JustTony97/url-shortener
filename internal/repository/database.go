@@ -88,7 +88,7 @@ func (r *DatabaseRepository) SetShortenedURLs(ctx context.Context, items []model
 }
 
 func (r *DatabaseRepository) GetOriginalURL(ctx context.Context, shortenedURL string) (*model.URL, error) {
-	query := `SELECT short_url, is_deleted FROM urls WHERE short_url = $1 LIMIT 1;`
+	query := `SELECT original_url, short_url, is_deleted FROM urls WHERE short_url = $1 LIMIT 1;`
 
 	var urlData model.URL
 	err := r.db.GetContext(ctx, &urlData, query, shortenedURL)
