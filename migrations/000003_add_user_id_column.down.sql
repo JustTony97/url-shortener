@@ -1,0 +1,1 @@
+ALTER TABLE public.urls DROP COLUMN user_id;
