@@ -11,9 +11,12 @@ type MockURLService struct {
 	mock.Mock
 }
 
-func (m *MockURLService) GetOriginalURL(ctx context.Context, shortenedURL string) (string, bool, error) {
+func (m *MockURLService) GetOriginalURL(ctx context.Context, shortenedURL string) (*model.URL, error) {
 	args := m.Called(ctx, shortenedURL)
-	return args.String(0), args.Bool(1), args.Error(2)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
+	}
+	return args.Get(0).(*model.URL), args.Error(1)
 }
 
 func (m *MockURLService) CreateShortURL(ctx context.Context, originalURL string, userID string) (string, error) {
@@ -35,4 +38,8 @@ func (m *MockURLService) GetUserURLs(ctx context.Context, userID string) ([]mode
 		return nil, args.Error(1)
 	}
 	return args.Get(0).([]model.URL), args.Error(1)
+}
+
+func (m *MockURLService) DeleteUserURLs(ctx context.Context, userID string, shortURLs []string) {
+	m.Called(ctx, userID, shortURLs)
 }

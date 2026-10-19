@@ -4,11 +4,13 @@ import (
 	"context"
 	"database/sql"
 	"errors"
+	"fmt"
 
 	"github.com/JustTony97/url-shortener.git/internal/logger"
 	"github.com/JustTony97/url-shortener.git/internal/model"
 	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jmoiron/sqlx"
+	"github.com/lib/pq"
 )
 
 var (
@@ -85,22 +87,20 @@ func (r *DatabaseRepository) SetShortenedURLs(ctx context.Context, items []model
 	return nil
 }
 
-func (r *DatabaseRepository) GetOriginalURL(ctx context.Context, shortenedURL string) (string, bool, error) {
-	query := `SELECT original_url FROM urls WHERE short_url = $1 LIMIT 1;`
+func (r *DatabaseRepository) GetOriginalURL(ctx context.Context, shortenedURL string) (*model.URL, error) {
+	query := `SELECT original_url, short_url, is_deleted FROM urls WHERE short_url = $1 LIMIT 1;`
 
-	var originalURL string
-	err := r.db.GetContext(ctx, &originalURL, query, shortenedURL)
+	var urlData model.URL
+	err := r.db.GetContext(ctx, &urlData, query, shortenedURL)
 
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
-			return "", false, nil
+			return nil, nil
 		}
-
-		logger.Log.Errorf("failed to get original url from database: %v", err)
-		return "", false, err
+		return nil, fmt.Errorf("repository: failed to get url state: %w", err)
 	}
 
-	return originalURL, true, nil
+	return &urlData, nil
 }
 
 func (r *DatabaseRepository) GetUserURLs(ctx context.Context, userID string) ([]model.URL, error) {
@@ -116,4 +116,25 @@ func (r *DatabaseRepository) GetUserURLs(ctx context.Context, userID string) ([]
 	}
 
 	return urls, nil
+}
+
+func (r *DatabaseRepository) DeleteUserURLs(ctx context.Context, userIDs []string, shortURLs []string) error {
+	if len(shortURLs) == 0 {
+		return nil
+	}
+
+	query := `
+		UPDATE urls 
+		SET is_deleted = true 
+		FROM unnest($1::text[], $2::text[]) AS batch(user_id, short_url)
+		WHERE urls.user_id = batch.user_id AND urls.short_url = batch.short_url;
+	`
+	_, err := r.db.ExecContext(ctx, query, pq.Array(userIDs), pq.Array(shortURLs))
+
+	if err != nil {
+		logger.Log.Error(err)
+		return err
+	}
+
+	return nil
 }

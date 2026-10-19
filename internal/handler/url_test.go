@@ -47,7 +47,11 @@ func TestURLHandler_RedirectURL(t *testing.T) {
 				LocationHeader: "https://yandex.ru",
 			},
 			setupMock: func(m *mocks.MockURLService) {
-				m.On("GetOriginalURL", mock.Anything, "4hvjC1").Return("https://yandex.ru", true, nil)
+				m.On("GetOriginalURL", mock.Anything, "4hvjC1").Return(&model.URL{
+					ShortURL:    "4hvjC1",
+					OriginalURL: "https://yandex.ru",
+					IsDeleted:   false,
+				}, nil)
 			},
 		},
 		{
@@ -60,7 +64,7 @@ func TestURLHandler_RedirectURL(t *testing.T) {
 				LocationHeader: "",
 			},
 			setupMock: func(m *mocks.MockURLService) {
-				m.On("GetOriginalURL", mock.Anything, "unknown_id").Return("", false, nil)
+				m.On("GetOriginalURL", mock.Anything, "unknown_id").Return(nil, nil)
 			},
 		},
 	}

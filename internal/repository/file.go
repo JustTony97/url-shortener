@@ -69,13 +69,13 @@ func (r *FileRepository) SetShortenedURL(ctx context.Context, shortenedURL strin
 	return nil
 }
 
-func (r *FileRepository) GetOriginalURL(ctx context.Context, shortenedURL string) (string, bool, error) {
+func (r *FileRepository) GetOriginalURL(ctx context.Context, shortenedURL string) (*model.URL, error) {
 	r.mu.RLock()
 	defer r.mu.RUnlock()
 
 	file, err := os.OpenFile(r.cfg.FileStoragePath, os.O_RDONLY|os.O_CREATE, 0666)
 	if err != nil {
-		return "", false, fmt.Errorf("file repo: open for read: %w", err)
+		return nil, fmt.Errorf("file repo: open for read: %w", err)
 	}
 	defer file.Close()
 
@@ -83,18 +83,18 @@ func (r *FileRepository) GetOriginalURL(ctx context.Context, shortenedURL string
 	decoder := json.NewDecoder(file)
 	if err := decoder.Decode(&urls); err != nil {
 		if err == io.EOF {
-			return "", false, nil
+			return nil, nil
 		}
-		return "", false, fmt.Errorf("file repo: decode json: %w", err)
+		return nil, fmt.Errorf("file repo: decode json: %w", err)
 	}
 
 	for _, u := range urls {
 		if u.ShortURL == shortenedURL {
-			return u.OriginalURL, true, nil
+			return &u, nil
 		}
 	}
 
-	return "", false, nil
+	return nil, nil
 }
 
 func (r *FileRepository) SetShortenedURLs(ctx context.Context, items []model.URL, userID string) error {
@@ -168,4 +168,53 @@ func (r *FileRepository) GetUserURLs(ctx context.Context, userID string) ([]mode
 	}
 
 	return userURLs, nil
+}
+
+func (r *FileRepository) DeleteUserURLs(ctx context.Context, userIDs []string, shortURLs []string) error {
+	if len(shortURLs) == 0 {
+		return nil
+	}
+
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
+	file, err := os.OpenFile(r.cfg.FileStoragePath, os.O_RDONLY|os.O_CREATE, 0666)
+	if err != nil {
+		return fmt.Errorf("file repo: open for delete reading: %w", err)
+	}
+
+	deleteURLs := make(map[string]string, len(shortURLs))
+	for i := 0; i < len(shortURLs); i++ {
+		deleteURLs[shortURLs[i]] = userIDs[i]
+	}
+
+	var allURLs []model.URL
+	decoder := json.NewDecoder(file)
+	if err := decoder.Decode(&allURLs); err != nil {
+		file.Close()
+		if err == io.EOF {
+			return nil
+		}
+		return fmt.Errorf("file repo: decode delete json: %w", err)
+	}
+	file.Close()
+
+	for i, u := range allURLs {
+		targetUserID, exists := deleteURLs[u.ShortURL]
+		if exists && u.UserID == targetUserID {
+			allURLs[i].IsDeleted = true
+		}
+	}
+
+	data, err := json.MarshalIndent(allURLs, "", "  ")
+	if err != nil {
+		return fmt.Errorf("file repo: marshal delete json: %w", err)
+	}
+
+	err = os.WriteFile(r.cfg.FileStoragePath, data, 0644)
+	if err != nil {
+		return fmt.Errorf("file repo: write delete file: %w", err)
+	}
+
+	return nil
 }

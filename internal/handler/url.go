@@ -23,10 +23,11 @@ type URLHandler struct {
 }
 
 type URLService interface {
-	GetOriginalURL(ctx context.Context, shortenedURL string) (string, bool, error)
+	GetOriginalURL(ctx context.Context, shortenedURL string) (*model.URL, error)
 	CreateShortURL(ctx context.Context, originalURL string, userID string) (string, error)
 	CreateShortURLs(ctx context.Context, reqItems []model.BatchItemRequest, userID string) ([]model.BatchResponseItem, error)
 	GetUserURLs(ctx context.Context, userID string) ([]model.URL, error)
+	DeleteUserURLs(ctx context.Context, userID string, shortURLs []string)
 }
 
 func NewURLHandler(s URLService, c config.Config) *URLHandler {
@@ -40,17 +41,22 @@ func (h *URLHandler) RedirectURL(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	originalURL, ok, err := h.service.GetOriginalURL(r.Context(), shortenedURL)
+	url, err := h.service.GetOriginalURL(r.Context(), shortenedURL)
 	if err != nil {
 		http.Error(w, "Internal server error", http.StatusInternalServerError)
 		return
 	}
-	if !ok {
+
+	if url == nil {
 		http.Error(w, "Missing original URL", http.StatusBadRequest)
 		return
 	}
+	if url.IsDeleted {
+		http.Error(w, "URL has been deleted", http.StatusGone)
+		return
+	}
 
-	http.Redirect(w, r, originalURL, http.StatusTemporaryRedirect)
+	http.Redirect(w, r, url.OriginalURL, http.StatusTemporaryRedirect)
 }
 
 func (h *URLHandler) ShortURL(w http.ResponseWriter, r *http.Request) {
@@ -234,4 +240,27 @@ func (h *URLHandler) GetUserURLs(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusOK)
 	encoder := json.NewEncoder(w)
 	encoder.Encode(response)
+}
+
+func (h *URLHandler) DeleteUserURLs(w http.ResponseWriter, r *http.Request) {
+	decoder := json.NewDecoder(r.Body)
+	defer r.Body.Close()
+
+	var request []string
+	err := decoder.Decode(&request)
+
+	if err != nil {
+		http.Error(w, "Failed to validate body", http.StatusBadRequest)
+		return
+	}
+
+	ctx := r.Context()
+	userID, ok := middlewares.GetUserIDFromContext(ctx)
+	if !ok {
+		http.Error(w, "unauthorized", http.StatusUnauthorized)
+		return
+	}
+
+	h.service.DeleteUserURLs(ctx, userID, request)
+	w.WriteHeader(http.StatusAccepted)
 }
